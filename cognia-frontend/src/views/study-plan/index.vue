@@ -1,5 +1,5 @@
 <template>
-  <div class="space-y-6">
+  <div class="space-y-6" v-loading="loading">
     <!-- 页面标题 -->
     <div class="flex items-center justify-between">
       <div>
@@ -80,7 +80,7 @@
                 <span class="text-text-secondary">注意：矩阵运算需要多检查，这是你的薄弱点</span>
               </div>
             </div>
-            <el-button type="primary" class="w-full mt-4" size="small">
+            <el-button type="primary" class="w-full mt-4" size="small" @click="ElMessage.info('专注模式功能开发中...')">
               <el-icon class="mr-1"><VideoPlay /></el-icon>开始专注模式
             </el-button>
           </div>
@@ -166,7 +166,7 @@
           <h3 class="font-bold text-text-primary text-lg">AI推荐计划模板</h3>
           <p class="text-sm text-text-muted">基于你的学习人格定制</p>
         </div>
-        <el-link type="primary" :underline="false">查看更多 ></el-link>
+        <el-link type="primary" underline="never">查看更多 ></el-link>
       </div>
       <div class="grid grid-cols-3 gap-6">
         <div
@@ -186,7 +186,7 @@
             <span><el-icon class="mr-1"><Clock /></el-icon>{{ template.duration }}</span>
             <span><el-icon class="mr-1"><Document /></el-icon>{{ template.taskCount }}个任务</span>
           </div>
-          <el-button type="primary" class="w-full mt-4" plain>使用此模板</el-button>
+          <el-button type="primary" class="w-full mt-4" plain @click="ElMessage.success('已应用该模板')">使用此模板</el-button>
         </div>
       </div>
     </div>
@@ -251,10 +251,65 @@
       </el-button>
     </template>
   </el-dialog>
+
+  <!-- 专注倒计时弹窗 -->
+  <el-dialog v-model="showTimer" :close-on-click-modal="false" width="480px" destroy-on-close>
+    <template #header>
+      <div class="flex items-center justify-between w-full">
+        <span class="text-lg font-bold text-text-primary">专注模式</span>
+        <el-button link @click="closeTimer">
+          <el-icon class="text-text-muted hover:text-text-primary"><Close /></el-icon>
+        </el-button>
+      </div>
+    </template>
+    <div class="text-center space-y-8">
+      <div class="text-text-primary font-medium text-lg">{{ activeTaskName }}</div>
+      <div class="flex justify-center">
+        <el-progress
+          type="circle"
+          :percentage="timerProgress"
+          :width="220"
+          :stroke-width="8"
+          :color="timerColor"
+        >
+          <template #default>
+            <div class="text-4xl font-bold text-text-primary font-mono">{{ formatTime(timeLeft) }}</div>
+            <div class="text-sm text-text-muted mt-2">{{ timerRunning ? '专注中...' : '已暂停' }}</div>
+          </template>
+        </el-progress>
+      </div>
+      <div class="flex justify-center gap-3 flex-wrap">
+        <el-tag
+          v-for="d in [15, 25, 45, 60]"
+          :key="d"
+          :effect="timerDuration === d * 60 ? 'dark' : 'plain'"
+          class="cursor-pointer"
+          :class="timerDuration === d * 60 ? 'bg-primary/40 border-primary/60' : ''"
+          @click="setTimerDuration(d)"
+        >
+          {{ d }}分钟
+        </el-tag>
+      </div>
+      <div class="flex justify-center gap-4">
+        <el-button v-if="!timerRunning" type="primary" size="large" @click="startTimer">
+          <el-icon class="mr-2"><VideoPlay /></el-icon>{{ timeLeft < timerDuration ? '继续' : '开始' }}
+        </el-button>
+        <el-button v-else size="large" @click="pauseTimer">
+          <el-icon class="mr-2"><VideoPause /></el-icon>暂停
+        </el-button>
+        <el-button size="large" @click="resetTimer">
+          <el-icon class="mr-2"><Refresh /></el-icon>重置
+        </el-button>
+      </div>
+      <el-button type="success" size="large" @click="completeTimer">
+        <el-icon class="mr-2"><CircleCheck /></el-icon>提前完成
+      </el-button>
+    </div>
+  </el-dialog>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
 import { LineChart, PieChart } from 'echarts/charts'
@@ -275,16 +330,122 @@ import {
   Document,
   Reading,
   Calendar,
+  Close,
+  VideoPause,
+  Refresh,
 } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { studyApi } from '@/api'
 
 use([CanvasRenderer, LineChart, PieChart, GridComponent, TooltipComponent, LegendComponent])
 
+const loading = ref(true)
 const viewMode = ref('周视图')
 const statsTimeRange = ref('近7天')
 const showCreateDialog = ref(false)
 const showGenerateDialog = ref(false)
 const isGenerating = ref(false)
 const currentWeekRange = ref('1月15日 - 1月21日')
+
+// 专注倒计时
+const showTimer = ref(false)
+const timerDuration = ref(25 * 60)
+const timeLeft = ref(25 * 60)
+const timerRunning = ref(false)
+const activeTaskName = ref('')
+const activeTaskId = ref<number | null>(null)
+let timerInterval: ReturnType<typeof setInterval> | null = null
+
+const timerProgress = computed(() => {
+  return Math.round(((timerDuration.value - timeLeft.value) / timerDuration.value) * 100)
+})
+const timerColor = computed(() => {
+  if (timeLeft.value < 60) return '#f43f5e'
+  if (timeLeft.value < 300) return '#f59e0b'
+  return '#6366f1'
+})
+
+const formatTime = (seconds: number) => {
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+}
+
+const setTimerDuration = (minutes: number) => {
+  if (timerRunning.value) return
+  timerDuration.value = minutes * 60
+  timeLeft.value = minutes * 60
+}
+
+const startTimer = () => {
+  timerRunning.value = true
+  timerInterval = setInterval(() => {
+    timeLeft.value--
+    if (timeLeft.value <= 0) {
+      completeTimer()
+    }
+  }, 1000)
+}
+
+const pauseTimer = () => {
+  timerRunning.value = false
+  if (timerInterval) { clearInterval(timerInterval); timerInterval = null }
+}
+
+const resetTimer = () => {
+  pauseTimer()
+  timeLeft.value = timerDuration.value
+}
+
+const completeTimer = () => {
+  pauseTimer()
+  if (activeTaskId.value !== null) {
+    const task = todayTasks.value.find(t => t.id === activeTaskId.value)
+    if (task) task.completed = true
+  }
+  ElMessage.success('专注完成！任务已标记为完成')
+  showTimer.value = false
+}
+
+const closeTimer = () => {
+  if (timerRunning.value) {
+    ElMessageBox.confirm('专注计时仍在进行，确定要退出吗？', '确认退出', { type: 'warning' })
+      .then(() => { pauseTimer(); showTimer.value = false })
+      .catch(() => {})
+  } else {
+    showTimer.value = false
+  }
+}
+
+onMounted(async () => {
+  try {
+    const records = await studyApi.getRecords(1, 1, 50)
+    if (records && records.list) {
+      todayTasks.value = records.list
+        .filter((r: any) => !r.completed)
+        .slice(0, 6)
+        .map((r: any) => ({
+          id: r.id || Date.now(),
+          name: r.content || r.subject || '未命名任务',
+          subject: r.subject || '高等数学',
+          duration: r.duration || 45,
+          goal: '完成学习目标',
+          completed: false,
+          aiRecommended: false,
+          borderColor: 'border-primary',
+          tagClass: 'bg-primary/20 text-primary border-primary/50',
+        }))
+    }
+  } catch {
+    // 后端不可用
+  } finally {
+    loading.value = false
+  }
+})
+
+onUnmounted(() => {
+  if (timerInterval) clearInterval(timerInterval)
+})
 
 const todayTasks = ref([
   {
@@ -490,21 +651,79 @@ const generateParams = ref({
   notes: '',
 })
 
-const updateProgress = () => {}
+const updateProgress = () => {
+  const completed = todayTasks.value.filter(t => t.completed).length
+  if (completed === todayTasks.value.length) {
+    ElMessage.success('今日所有任务已完成，太棒了！')
+  }
+}
 
 const startTask = (task: any) => {
-  console.log('开始任务:', task)
+  activeTaskName.value = task.name
+  activeTaskId.value = task.id
+  timerDuration.value = task.duration * 60
+  timeLeft.value = task.duration * 60
+  timerRunning.value = false
+  showTimer.value = true
 }
 
 const editTask = (task: any) => {
-  console.log('编辑任务:', task)
+  newPlan.value = {
+    name: task.name,
+    subject: '',
+    date: '',
+    startTime: '',
+    duration: task.duration,
+    goal: task.goal,
+  }
+  showCreateDialog.value = true
 }
 
-const prevWeek = () => {}
-const nextWeek = () => {}
+const prevWeek = () => {
+  ElMessage.info('切换到上一周视图（演示模式）')
+}
+const nextWeek = () => {
+  ElMessage.info('切换到下一周视图（演示模式）')
+}
 
 const createPlan = () => {
+  if (!newPlan.value.name.trim() || !newPlan.value.subject) {
+    ElMessage.warning('请填写计划名称和学科')
+    return
+  }
+  const subjectMap: Record<string, string> = {
+    'math': '高等数学',
+    'linear': '线性代数',
+    'english': '英语',
+    'major': '专业课',
+  }
+  const borderColorMap: Record<string, string> = {
+    'math': 'border-primary',
+    'linear': 'border-accent-purple',
+    'english': 'border-blue-500',
+    'major': 'border-emerald-500',
+  }
+  const tagClassMap: Record<string, string> = {
+    'math': 'bg-primary/20 text-primary border-primary/50',
+    'linear': 'bg-accent-purple/20 text-accent-purple border-accent-purple/50',
+    'english': 'bg-blue-500/20 text-blue-400 border-blue-500/50',
+    'major': 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50',
+  }
+  const newTask = {
+    id: Date.now(),
+    name: newPlan.value.name,
+    subject: subjectMap[newPlan.value.subject] || newPlan.value.subject,
+    duration: newPlan.value.duration,
+    goal: newPlan.value.goal || '完成学习目标',
+    completed: false,
+    aiRecommended: false,
+    borderColor: borderColorMap[newPlan.value.subject] || 'border-primary',
+    tagClass: tagClassMap[newPlan.value.subject] || 'bg-primary/20 text-primary border-primary/50',
+  }
+  todayTasks.value.push(newTask)
   showCreateDialog.value = false
+  newPlan.value = { name: '', subject: '', date: '', startTime: '', duration: 45, goal: '' }
+  ElMessage.success('学习计划已创建')
 }
 
 const generatePlan = () => {

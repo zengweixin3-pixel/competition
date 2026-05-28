@@ -1,5 +1,5 @@
 <template>
-  <div class="space-y-6">
+  <div class="space-y-6" v-loading="loading">
     <!-- 页面标题 -->
     <div class="flex items-center justify-between">
       <div>
@@ -101,7 +101,7 @@
           <h3 class="font-bold text-text-primary text-lg">错题改进追踪</h3>
           <p class="text-sm text-text-muted">见证你的错题攻克之路</p>
         </div>
-        <el-link type="primary" :underline="false">查看详情 ></el-link>
+        <el-link type="primary" underline="never">查看详情 ></el-link>
       </div>
       <div class="grid grid-cols-4 gap-6">
         <div class="bg-dark-bg/50 rounded-xl p-6 text-center">
@@ -145,7 +145,7 @@
           <h3 class="font-bold text-text-primary text-lg">学习成就</h3>
           <p class="text-sm text-text-muted">你的每一个进步都值得被记录</p>
         </div>
-        <el-link type="primary" :underline="false">查看全部 ></el-link>
+        <el-link type="primary" underline="never">查看全部 ></el-link>
       </div>
       <div class="grid grid-cols-4 gap-6">
         <div
@@ -218,7 +218,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
 import { LineChart, BarChart, PieChart, RadarChart } from 'echarts/charts'
@@ -239,9 +239,12 @@ import {
   Medal,
   Target,
 } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import { studyApi } from '@/api'
 
 use([CanvasRenderer, LineChart, BarChart, PieChart, RadarChart, GridComponent, TooltipComponent, LegendComponent, RadarComponent])
 
+const loading = ref(true)
 const trendTimeRange = ref('近30天')
 const abilitySubject = ref('all')
 
@@ -554,6 +557,66 @@ const aiSummary = ref({
   coachMessage: '小明同学，这个月你的学习表现非常出色！特别是连续23天的坚持，让我看到了你的毅力。高数的进步也很明显，继续保持！不过要注意平衡各科的学习时间，线性代数还需要加强。记住，学习是一场马拉松，保持节奏比冲刺更重要。加油！',
 })
 
-const exportReport = () => {}
-const shareReport = () => {}
+const exportReport = () => {
+  const reportHtml = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Cognia 学习报告</title>
+<style>body{font-family:sans-serif;max-width:800px;margin:0 auto;padding:40px;color:#1f2937;background:#fff}h1{color:#6366f1}h2{color:#374151;border-bottom:2px solid #6366f1;padding-bottom:8px}.stat{display:inline-block;margin:12px 24px 12px 0}.stat .num{font-size:32px;font-weight:bold;color:#6366f1}.highlight{background:#eef2ff;padding:16px;border-radius:8px;margin:12px 0}li{margin:8px 0}</style></head><body>
+<h1>Cognia AI学习报告</h1>
+<h2>核心数据</h2>
+<div class="stat"><div class="num">${overview.value.totalHours}h</div>总学习时长</div>
+<div class="stat"><div class="num">${overview.value.avgDaily}h</div>日均学习</div>
+<div class="stat"><div class="num">${overview.value.accuracy}%</div>平均正确率</div>
+<div class="stat"><div class="num">${overview.value.streak}天</div>连续学习</div>
+<h2>错题改进</h2>
+<p>累计错题: ${mistakeStats.value.total} | 已掌握: ${mistakeStats.value.mastered} | 改进率: ${mistakeStats.value.improvement}%</p>
+<h2>AI教练总结</h2>
+<div class="highlight"><h3>本月亮点</h3><ul>${aiSummary.value.highlights.map((h: string) => `<li>${h}</li>`).join('')}</ul></div>
+<div class="highlight"><h3>改进建议</h3><ul>${aiSummary.value.suggestions.map((s: string) => `<li>${s}</li>`).join('')}</ul></div>
+<p><em>${aiSummary.value.coachMessage}</em></p>
+</body></html>`
+  const blob = new Blob([reportHtml], { type: 'text/html;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `Cognia学习报告_${new Date().toISOString().slice(0, 10)}.html`
+  a.click()
+  URL.revokeObjectURL(url)
+  ElMessage.success('报告已导出')
+}
+
+const shareReport = () => {
+  const summary = `【Cognia学习报告】
+总学习时长: ${overview.value.totalHours}小时 | 日均: ${overview.value.avgDaily}h
+平均正确率: ${overview.value.accuracy}% | 连续学习: ${overview.value.streak}天
+错题改进率: ${mistakeStats.value.improvement}% | 已掌握错题: ${mistakeStats.value.mastered}道
+—— 来自Cognia AI学习人格教练`
+  navigator.clipboard.writeText(summary).then(() => {
+    ElMessage.success('报告摘要已复制到剪贴板')
+  }).catch(() => {
+    ElMessage.warning('复制失败')
+  })
+}
+
+onMounted(async () => {
+  try {
+    const apiStats = await studyApi.getStats(1)
+    if (apiStats) {
+      overview.value = {
+        totalHours: Number(apiStats.totalHours) || 0,
+        hoursChange: Number(apiStats.hoursChange) || 0,
+        avgDaily: Number(apiStats.avgDaily) || 0,
+        dailyChange: Number(apiStats.dailyChange) || 0,
+        completedTasks: Number(apiStats.completedTasks) || 0,
+        tasksChange: Number(apiStats.tasksChange) || 0,
+        accuracy: Number(apiStats.accuracy) || 0,
+        accuracyChange: Number(apiStats.accuracyChange) || 0,
+        streak: Number(apiStats.streak) || 0,
+      }
+    }
+  } catch {
+    // 后端不可用
+  } finally {
+    loading.value = false
+  }
+})
 </script>

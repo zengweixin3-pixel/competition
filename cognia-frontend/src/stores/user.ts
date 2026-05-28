@@ -1,45 +1,56 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { userApi } from '@/api'
 
 export const useUserStore = defineStore('user', () => {
+  const DEFAULT_AVATAR = 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png'
+
+  const avatarUrl = ref(localStorage.getItem('cognia-avatar') || DEFAULT_AVATAR)
+  const loading = ref(false)
+
+  const setAvatar = (url: string) => {
+    avatarUrl.value = url
+    localStorage.setItem('cognia-avatar', url)
+  }
+
   const userInfo = ref({
     id: 1,
-    username: '小明同学',
+    username: '加载中...',
     avatar: '',
-    learningType: '理解驱动型',
-    emotionState: '专注',
-    studyLevel: 12,
-    continuousDays: 7,
-    todayFocusTime: 4.2,
+    learningType: '',
+    emotionState: '',
+    studyLevel: 0,
+    continuousDays: 0,
+    todayFocusTime: 0,
   })
 
   const learningDNA = ref({
-    type: '理解驱动型',
-    subType: '夜间高效型',
-    tags: ['理解驱动型', '夜间高效型', '焦虑型学习者'],
-    strengths: ['理解速度快', '图像记忆强'],
-    weaknesses: ['容易拖延', '长时间学习效率下降'],
-    suggestions: ['25分钟番茄钟', '晚间学习最佳', '先理解后刷题'],
+    type: '',
+    subType: '',
+    tags: [] as string[],
+    strengths: [] as string[],
+    weaknesses: [] as string[],
+    suggestions: [] as string[],
     radarData: [
-      { name: '理解能力', value: 85 },
-      { name: '记忆能力', value: 72 },
-      { name: '专注持久度', value: 65 },
-      { name: '计划执行力', value: 58 },
-      { name: '情绪稳定度', value: 70 },
-      { name: '逻辑思维', value: 78 },
+      { name: '理解能力', value: 0 },
+      { name: '记忆能力', value: 0 },
+      { name: '专注持久度', value: 0 },
+      { name: '计划执行力', value: 0 },
+      { name: '情绪稳定度', value: 0 },
+      { name: '逻辑思维', value: 0 },
     ],
   })
 
   const todayStats = ref({
-    studyTime: 4.2,
-    studyTimeChange: 12,
-    focusScore: 82,
-    focusScoreChange: 5,
-    completedTasks: 5,
-    totalTasks: 8,
-    tasksChange: 20,
-    accuracy: 76,
-    accuracyChange: -3,
+    studyTime: 0,
+    studyTimeChange: 0,
+    focusScore: 0,
+    focusScoreChange: 0,
+    completedTasks: 0,
+    totalTasks: 0,
+    tasksChange: 0,
+    accuracy: 0,
+    accuracyChange: 0,
   })
 
   const emotionOptions = [
@@ -50,7 +61,57 @@ export const useUserStore = defineStore('user', () => {
     { label: '很烦躁', value: 'frustrated', icon: '😫', color: '#ef4444' },
   ]
 
+  const loadUser = async () => {
+    loading.value = true
+    try {
+      const user = await userApi.getUserInfo()
+      userInfo.value = {
+        id: user.id || 1,
+        username: user.username || '同学',
+        avatar: user.avatar || '',
+        learningType: user.learningType || '',
+        emotionState: user.emotionState || '',
+        studyLevel: user.studyLevel || 0,
+        continuousDays: user.continuousDays || 0,
+        todayFocusTime: user.todayFocusTime || 0,
+      }
+    } catch {
+      console.warn('用户信息加载失败，使用默认值')
+    } finally {
+      loading.value = false
+    }
+  }
+
+  const loadDNA = async () => {
+    try {
+      const dna = await userApi.getLearningDNA()
+      learningDNA.value = {
+        type: dna.dnaType || '',
+        subType: dna.subType || '',
+        tags: dna.tags ? dna.tags.split(',') : [],
+        strengths: dna.strengths ? dna.strengths.split(',') : [],
+        weaknesses: dna.weaknesses ? dna.weaknesses.split(',') : [],
+        suggestions: dna.suggestions ? dna.suggestions.split(',') : [],
+        radarData: [
+          { name: '理解能力', value: dna.understanding || 0 },
+          { name: '记忆能力', value: dna.memory || 0 },
+          { name: '专注持久度', value: dna.focus || 0 },
+          { name: '计划执行力', value: dna.execution || 0 },
+          { name: '情绪稳定度', value: dna.emotion || 0 },
+          { name: '逻辑思维', value: dna.logic || 0 },
+        ],
+      }
+    } catch {
+      console.warn('学习DNA加载失败，使用默认值')
+    }
+  }
+
   return {
+    avatarUrl,
+    setAvatar,
+    loading,
+    loadUser,
+    loadDNA,
     userInfo,
     learningDNA,
     todayStats,

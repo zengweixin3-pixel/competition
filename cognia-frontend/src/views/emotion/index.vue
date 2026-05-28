@@ -1,5 +1,5 @@
 <template>
-  <div class="space-y-6">
+  <div class="space-y-6" v-loading="loading">
     <!-- 页面标题 -->
     <div class="flex items-center justify-between">
       <div>
@@ -241,7 +241,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
 import { LineChart, ScatterChart, BarChart } from 'echarts/charts'
@@ -256,9 +256,12 @@ import {
   Moon,
   Star,
 } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import { emotionApi } from '@/api'
 
 use([CanvasRenderer, LineChart, ScatterChart, BarChart, GridComponent, TooltipComponent, LegendComponent])
 
+const loading = ref(true)
 const emotionTimeRange = ref('近7天')
 const diaryTimeRange = ref('全部')
 const showRecordDialog = ref(false)
@@ -480,10 +483,80 @@ const emotionRecords = ref([
   },
 ])
 
+const getAIResponse = (emotionValue: string) => {
+  const map: Record<string, string> = {
+    'great': '太棒了！保持这样的状态，学习效率会非常高！',
+    'good': '状态不错，继续按照计划推进学习吧！',
+    'normal': '平凡的日子也很珍贵，尝试找一些学习的乐趣吧。',
+    'tired': '累了就休息一下，根据你的学习人格，建议采用25分钟番茄钟。',
+    'frustrated': '烦躁的时候不妨暂停学习，出去走走或听首喜欢的歌。',
+  }
+  return map[emotionValue] || '感谢你的记录，AI会更加了解你的学习状态。'
+}
+
 const saveEmotionRecord = () => {
+  if (!selectedEmotion.value) {
+    ElMessage.warning('请选择当前心情')
+    return
+  }
+  const emotion = emotions.find(e => e.value === selectedEmotion.value)
+  const now = new Date()
+  const timeStr = `今天 ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
+  const tagClassMap: Record<string, string> = {
+    'great': 'bg-primary/30 border-primary/50 text-primary',
+    'good': 'bg-emerald-500/30 border-emerald-500/50 text-emerald-400',
+    'normal': 'bg-blue-500/30 border-blue-500/50 text-blue-400',
+    'tired': 'bg-amber-500/30 border-amber-500/50 text-amber-400',
+    'frustrated': 'bg-rose-500/30 border-rose-500/50 text-rose-400',
+  }
+  emotionRecords.value.unshift({
+    id: Date.now(),
+    icon: emotion?.icon || '😐',
+    time: timeStr,
+    title: `心情：${emotion?.label || '一般'}`,
+    label: emotion?.label || '一般',
+    tagClass: tagClassMap[selectedEmotion.value] || 'bg-blue-500/30 border-blue-500/50 text-blue-400',
+    content: emotionNote.value || '今天没有特别的感受',
+    aiResponse: getAIResponse(selectedEmotion.value),
+  })
   showRecordDialog.value = false
   selectedEmotion.value = ''
   emotionNote.value = ''
   relatedActivity.value = ''
+  ElMessage.success('心情已记录，AI会更懂你哦')
 }
+
+onMounted(async () => {
+  try {
+    const now = new Date()
+    const start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+    const end = now.toISOString().slice(0, 10)
+    const records = await emotionApi.getRecords(1, start, end)
+    if (records && Array.isArray(records)) {
+      emotionRecords.value = records.map((r: any) => ({
+        id: r.id || Date.now(),
+        icon: r.emotionType === 'great' ? '😄' : r.emotionType === 'good' ? '🙂' : r.emotionType === 'normal' ? '😐' : r.emotionType === 'tired' ? '😔' : '😫',
+        time: (r.recordDate || '').slice(5) || '今天',
+        title: r.emotionLabel ? `心情：${r.emotionLabel}` : '心情记录',
+        label: r.emotionLabel || '一般',
+        tagClass: 'bg-emerald-500/30 border-emerald-500/50 text-emerald-400',
+        content: r.content || '',
+        aiResponse: r.aiResponse || '',
+      }))
+    }
+    const apiStats = await emotionApi.getStats()
+    if (apiStats) {
+      emotionStats.value = {
+        positive: Number(apiStats.positive) || 0,
+        neutral: Number(apiStats.neutral) || 0,
+        negative: Number(apiStats.negative) || 0,
+        stability: Number(apiStats.stability) || 0,
+      }
+    }
+  } catch {
+    // 后端不可用
+  } finally {
+    loading.value = false
+  }
+})
 </script>

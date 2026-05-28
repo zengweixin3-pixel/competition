@@ -1,5 +1,5 @@
 <template>
-  <div class="space-y-6">
+  <div class="space-y-6" v-loading="loading">
     <!-- 第一行：AI学习人格 + 今日学习概览 + AI今日建议 -->
     <div class="grid grid-cols-12 gap-6">
       <!-- AI学习人格 -->
@@ -22,7 +22,7 @@
             <p class="text-sm text-text-secondary leading-relaxed">
               你擅长深入理解知识，喜欢探索原理，在安静的环境中效率更高，适合深度学习。
             </p>
-            <el-button type="primary" class="mt-4" size="small">
+            <el-button type="primary" class="mt-4" size="small" @click="router.push('/learning-dna')">
               查看完整分析 <el-icon class="ml-1"><ArrowRight /></el-icon>
             </el-button>
           </div>
@@ -93,7 +93,7 @@
             <span>学习时长：90 分钟</span>
           </div>
         </div>
-        <el-button type="primary" class="w-full mt-4">
+        <el-button type="primary" class="w-full mt-4" @click="router.push('/study-plan')">
           开始学习计划
         </el-button>
       </div>
@@ -118,7 +118,7 @@
           </div>
         </div>
         <div class="mt-4 text-center">
-          <el-link type="primary" :underline="false">查看全部任务 →</el-link>
+          <el-link type="primary" underline="never" @click="router.push('/study-plan')">查看全部任务 →</el-link>
         </div>
       </div>
 
@@ -141,7 +141,7 @@
           </div>
         </div>
         <div class="mt-4 text-center">
-          <el-link type="primary" :underline="false">查看全部错题 →</el-link>
+          <el-link type="primary" underline="never" @click="router.push('/mistake')">查看全部错题 →</el-link>
         </div>
       </div>
 
@@ -151,6 +151,12 @@
           <h3 class="font-bold text-text-primary">学习数据</h3>
           <el-dropdown>
             <span class="text-sm text-text-muted cursor-pointer">近 7 天 <el-icon><ArrowDown /></el-icon></span>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="7">近 7 天</el-dropdown-item>
+                <el-dropdown-item command="30">近 30 天</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
           </el-dropdown>
         </div>
         <div class="h-40">
@@ -162,12 +168,12 @@
       <div class="col-span-3 card-gradient rounded-2xl p-6">
         <div class="flex items-center justify-between mb-4">
           <h3 class="font-bold text-text-primary">学习成就</h3>
-          <el-link type="primary" :underline="false">更多 ></el-link>
+          <el-link type="primary" underline="never" @click="router.push('/achievements')">更多 ></el-link>
         </div>
         <div class="bg-gradient-to-br from-amber-500/20 to-orange-500/20 rounded-xl p-4 border border-amber-500/30 mb-4">
           <div class="flex items-center gap-3">
             <div class="w-12 h-12 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
-              <el-icon class="text-white text-xl"><Trophy /></el-icon>
+              <el-icon class="text-gray-900 text-xl"><Trophy /></el-icon>
             </div>
             <div>
               <div class="font-bold text-text-primary">连续学习 7 天</div>
@@ -225,7 +231,7 @@
             <el-avatar v-if="!msg.isUser" :size="36" class="bg-gradient-primary">
               <el-icon class="text-white"><ChatDotRound /></el-icon>
             </el-avatar>
-            <el-avatar v-else :size="36" src="https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png" />
+            <el-avatar v-else :size="36" :src="userStore.avatarUrl" />
             <div class="max-w-[70%]" :class="msg.isUser ? 'text-right' : ''">
               <div class="inline-block px-4 py-2 rounded-xl text-sm" :class="msg.isUser ? 'bg-primary text-white' : 'bg-dark-border text-text-primary'">
                 {{ msg.content }}
@@ -268,13 +274,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
 import { RadarChart, LineChart, BarChart } from 'echarts/charts'
 import { GridComponent, TooltipComponent, LegendComponent, RadarComponent } from 'echarts/components'
 import VChart from 'vue-echarts'
 import { useUserStore } from '@/stores/user'
+import { studyApi } from '@/api'
 import {
   ArrowRight,
   Moon,
@@ -290,10 +298,37 @@ import {
   Calendar,
   Promotion,
 } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 
 use([CanvasRenderer, RadarChart, LineChart, BarChart, GridComponent, TooltipComponent, LegendComponent, RadarComponent])
 
 const userStore = useUserStore()
+const router = useRouter()
+const loading = ref(true)
+
+onMounted(async () => {
+  try {
+    await Promise.all([userStore.loadUser(), userStore.loadDNA()])
+    const apiStats = await studyApi.getStats()
+    if (apiStats) {
+      userStore.todayStats = {
+        studyTime: Number(apiStats.studyTime) || userStore.todayStats.studyTime,
+        studyTimeChange: Number(apiStats.studyTimeChange) || 0,
+        focusScore: Number(apiStats.focusScore) || 0,
+        focusScoreChange: Number(apiStats.focusScoreChange) || 0,
+        completedTasks: Number(apiStats.completedTasks) || 0,
+        totalTasks: Number(apiStats.totalTasks) || 0,
+        tasksChange: Number(apiStats.tasksChange) || 0,
+        accuracy: Number(apiStats.accuracy) || 0,
+        accuracyChange: Number(apiStats.accuracyChange) || 0,
+      }
+    }
+  } catch {
+    // 后端不可用，保持初始值
+  } finally {
+    loading.value = false
+  }
+})
 
 const stats = computed(() => userStore.todayStats)
 
@@ -477,6 +512,12 @@ const selectEmotion = (emotion: any) => {
 }
 
 const saveMood = () => {
-  console.log('保存心情:', selectedEmotion.value, moodNote.value)
+  if (!selectedEmotion.value) {
+    ElMessage.warning('请先选择一个心情')
+    return
+  }
+  ElMessage.success('心情已保存，AI会更加了解你的学习状态')
+  selectedEmotion.value = ''
+  moodNote.value = ''
 }
 </script>

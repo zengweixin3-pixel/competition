@@ -43,6 +43,21 @@ const router = createRouter({
           name: 'Report',
           component: () => import('@/views/report/index.vue'),
         },
+        {
+          path: '/knowledge',
+          name: 'Knowledge',
+          component: () => import('@/views/knowledge/index.vue'),
+        },
+        {
+          path: '/achievements',
+          name: 'Achievements',
+          component: () => import('@/views/achievements/index.vue'),
+        },
+        {
+          path: '/settings',
+          name: 'Settings',
+          component: () => import('@/views/settings/index.vue'),
+        },
       ],
     },
   ],

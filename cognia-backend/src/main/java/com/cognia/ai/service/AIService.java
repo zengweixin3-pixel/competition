@@ -18,13 +18,13 @@ import java.util.concurrent.TimeUnit;
 @Service
 public class AIService {
 
-    @Value("${ai.openai.api-key}")
+    @Value("${ai.bailian.api-key}")
     private String apiKey;
 
-    @Value("${ai.openai.base-url}")
+    @Value("${ai.bailian.base-url}")
     private String baseUrl;
 
-    @Value("${ai.openai.model}")
+    @Value("${ai.bailian.model}")
     private String model;
 
     private final OkHttpClient client = new OkHttpClient.Builder()

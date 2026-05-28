@@ -1,5 +1,5 @@
 <template>
-  <div class="space-y-6">
+  <div class="space-y-6" v-loading="loading">
     <!-- 页面标题 -->
     <div class="flex items-center justify-between">
       <div>
@@ -195,7 +195,8 @@
       </el-upload>
       <div>
         <div class="text-sm text-text-primary mb-2">或手动输入</div>
-        <el-input type="textarea" :rows="4" placeholder="粘贴题目内容..." />
+        <el-input v-model="uploadTitle" placeholder="错题标题（可选）" class="mb-3" />
+        <el-input v-model="uploadContent" type="textarea" :rows="4" placeholder="粘贴题目内容..." />
       </div>
       <div class="flex gap-4">
         <el-select v-model="uploadSubject" placeholder="选择学科" class="flex-1">
@@ -221,8 +222,8 @@
   <el-dialog v-model="showAnalysisDialog" title="AI错因分析" width="700px" destroy-on-close>
     <div v-if="selectedMistake" class="space-y-6">
       <div class="bg-dark-bg/50 rounded-xl p-4">
-        <div class="text-sm text-text-muted mb-2">题目</div>
-        <div class="text-text-primary">{{ selectedMistake.title }}</div>
+        <div class="text-sm text-gray-600 mb-2">题目</div>
+        <div class="text-gray-900 font-medium">{{ selectedMistake.title }}</div>
       </div>
 
       <div class="grid grid-cols-2 gap-4">
@@ -231,14 +232,14 @@
             <el-icon class="text-rose-400"><CircleClose /></el-icon>
             <span class="font-medium text-rose-400">错误原因</span>
           </div>
-          <div class="text-text-primary">{{ selectedMistake.analysis?.reason }}</div>
+          <div class="text-gray-800">{{ selectedMistake.analysis?.reason }}</div>
         </div>
         <div class="bg-amber-500/10 rounded-xl p-4 border border-amber-500/30">
           <div class="flex items-center gap-2 mb-2">
             <el-icon class="text-amber-400"><Warning /></el-icon>
             <span class="font-medium text-amber-400">根本问题</span>
           </div>
-          <div class="text-text-primary">{{ selectedMistake.analysis?.rootCause }}</div>
+          <div class="text-gray-800">{{ selectedMistake.analysis?.rootCause }}</div>
         </div>
       </div>
 
@@ -248,7 +249,7 @@
           <span class="font-medium text-emerald-400">AI建议</span>
         </div>
         <ul class="space-y-2">
-          <li v-for="(suggestion, idx) in selectedMistake.analysis?.suggestions" :key="idx" class="flex items-start gap-2 text-text-primary">
+          <li v-for="(suggestion, idx) in selectedMistake.analysis?.suggestions" :key="idx" class="flex items-start gap-2 text-gray-800">
             <span class="text-emerald-400 mt-1">•</span>
             <span>{{ suggestion }}</span>
           </li>
@@ -275,12 +276,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
 import { PieChart, BarChart } from 'echarts/charts'
 import { GridComponent, TooltipComponent, LegendComponent } from 'echarts/components'
 import VChart from 'vue-echarts'
+import { mistakeApi } from '@/api'
 import {
   Upload,
   VideoPlay,
@@ -292,8 +294,11 @@ import {
   CircleClose,
   Warning,
 } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 
 use([CanvasRenderer, PieChart, BarChart, GridComponent, TooltipComponent, LegendComponent])
+
+const loading = ref(true)
 
 const stats = ref({
   total: 128,
@@ -316,6 +321,8 @@ const showAnalysisDialog = ref(false)
 const selectedMistake = ref<any>(null)
 const uploadSubject = ref('')
 const uploadDifficulty = ref('')
+const uploadContent = ref('')
+const uploadTitle = ref('')
 
 const mistakeTypeOption = {
   tooltip: {
@@ -484,14 +491,52 @@ const mistakes = ref([
   },
 ])
 
-const filteredMistakes = computed(() => mistakes.value)
+const filteredMistakes = computed(() => {
+  let result = [...mistakes.value]
+  if (searchQuery.value.trim()) {
+    const q = searchQuery.value.trim().toLowerCase()
+    result = result.filter(m =>
+      m.title.toLowerCase().includes(q) ||
+      m.content.toLowerCase().includes(q) ||
+      m.subject.toLowerCase().includes(q)
+    )
+  }
+  if (filterSubject.value) {
+    const subjectMap: Record<string, string> = {
+      'math': '高等数学',
+      'linear': '线性代数',
+      'english': '英语',
+      'major': '专业课',
+    }
+    const subjectName = subjectMap[filterSubject.value] || filterSubject.value
+    result = result.filter(m => m.subject === subjectName)
+  }
+  if (filterType.value) {
+    const typeMap: Record<string, string> = {
+      'concept': '概念混淆',
+      'calculation': '计算错误',
+      'careless': '粗心大意',
+      'formula': '公式遗忘',
+    }
+    const typeName = typeMap[filterType.value] || filterType.value
+    result = result.filter(m => m.mistakeType === typeName)
+  }
+  if (sortBy.value === 'count') {
+    result.sort((a, b) => b.errorCount - a.errorCount)
+  } else if (sortBy.value === 'difficulty') {
+    const diffOrder: Record<string, number> = { '困难': 3, '中等': 2, '简单': 1 }
+    result.sort((a, b) => (diffOrder[b.difficulty] || 0) - (diffOrder[a.difficulty] || 0))
+  }
+  return result
+})
 
 const viewMistakeDetail = (mistake: any) => {
-  console.log('查看错题详情:', mistake)
+  selectedMistake.value = mistake
+  showAnalysisDialog.value = true
 }
 
 const reviewMistake = (mistake: any) => {
-  console.log('复习错题:', mistake)
+  ElMessage.success(`开始复习：${mistake.title}，AI将为你生成针对性练习`)
 }
 
 const viewAnalysis = (mistake: any) => {
@@ -500,10 +545,91 @@ const viewAnalysis = (mistake: any) => {
 }
 
 const uploadMistake = () => {
+  const content = uploadContent.value.trim()
+  if (!content) {
+    ElMessage.warning('请输入错题内容')
+    return
+  }
+  if (!uploadSubject.value) {
+    ElMessage.warning('请选择学科')
+    return
+  }
+  const subjectMap: Record<string, string> = {
+    'math': '高等数学', 'linear': '线性代数', 'english': '英语', 'major': '专业课',
+  }
+  const diffMap: Record<string, string> = {
+    'easy': '简单', 'medium': '中等', 'hard': '困难',
+  }
+  const subjectName = subjectMap[uploadSubject.value] || uploadSubject.value
+  const difficultyName = diffMap[uploadDifficulty.value] || '中等'
+  const newMistake = {
+    id: Date.now(),
+    title: uploadTitle.value.trim() || content.slice(0, 30) + (content.length > 30 ? '...' : ''),
+    content,
+    subject: subjectName,
+    mistakeType: '概念混淆',
+    errorCount: 1,
+    difficulty: difficultyName,
+    addTime: new Date().toISOString().slice(0, 10),
+    icon: 'Document',
+    iconBg: 'bg-primary/20',
+    iconColor: 'text-primary',
+    borderColor: 'border-primary',
+    tagType: 'primary',
+    typeTagClass: 'bg-primary/30 border-primary/50',
+    analysis: null,
+  }
+  mistakes.value.unshift(newMistake)
+  stats.value.total++
+  stats.value.pending++
   showUploadDialog.value = false
+  uploadContent.value = ''
+  uploadTitle.value = ''
+  uploadSubject.value = ''
+  uploadDifficulty.value = ''
+  ElMessage.success('错题已上传，AI正在分析中...')
 }
 
 const startReview = () => {
-  console.log('开始复习')
+  ElMessage.info('复习模式已启动，请选择待复习的错题')
 }
+
+onMounted(async () => {
+  try {
+    const data = await mistakeApi.getList(1, { pageNum: 1, pageSize: 50 })
+    if (data && data.list) {
+      mistakes.value = data.list.map((m: any) => ({
+        id: m.id || Date.now(),
+        title: m.title || '',
+        content: m.content || '',
+        subject: m.subject || '',
+        mistakeType: m.mistakeType || '概念混淆',
+        errorCount: m.errorCount || 1,
+        difficulty: m.difficulty || '中等',
+        addTime: (m.createTime || '').slice(0, 10),
+        icon: 'Document',
+        iconBg: 'bg-primary/20',
+        iconColor: 'text-primary',
+        borderColor: 'border-primary',
+        tagType: 'primary',
+        typeTagClass: 'bg-primary/30 border-primary/50',
+        analysis: null,
+      }))
+      totalMistakes.value = data.total || mistakes.value.length
+    }
+    const apiStats = await mistakeApi.getStats()
+    if (apiStats) {
+      stats.value = {
+        total: Number(apiStats.total) || 0,
+        pending: Number(apiStats.pending) || 0,
+        mastered: Number(apiStats.mastered) || 0,
+        accuracy: Number(apiStats.accuracy) || 0,
+      }
+    }
+  } catch {
+    // 后端不可用，保持默认数据
+  } finally {
+    loading.value = false
+  }
+})
 </script>

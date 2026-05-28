@@ -48,7 +48,7 @@
             <el-icon class="text-text-muted cursor-pointer hover:text-text-primary" @click="clearChat"><Delete /></el-icon>
           </el-tooltip>
           <el-tooltip content="设置">
-            <el-icon class="text-text-muted cursor-pointer hover:text-text-primary"><Setting /></el-icon>
+            <el-icon class="text-text-muted cursor-pointer hover:text-text-primary" @click="ElMessage.info('AI助手设置开发中...')"><Setting /></el-icon>
           </el-tooltip>
         </div>
       </div>
@@ -71,7 +71,7 @@
             <div v-if="!message.isUser" class="w-10 h-10 rounded-full bg-gradient-primary flex items-center justify-center">
               <el-icon class="text-white"><ChatDotRound /></el-icon>
             </div>
-            <el-avatar v-else :size="40" src="https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png" />
+            <el-avatar v-else :size="40" :src="userStore.avatarUrl" />
           </div>
 
           <!-- 消息内容 -->
@@ -122,10 +122,10 @@
               <el-button link size="small" class="text-text-muted hover:text-primary" @click="copyMessage(message.content)">
                 <el-icon class="mr-1"><CopyDocument /></el-icon>复制
               </el-button>
-              <el-button link size="small" class="text-text-muted hover:text-primary">
+              <el-button link size="small" class="text-text-muted hover:text-primary" @click="regenerateMessage()">
                 <el-icon class="mr-1"><RefreshRight /></el-icon>重新生成
               </el-button>
-              <el-button link size="small" class="text-text-muted hover:text-primary">
+              <el-button link size="small" class="text-text-muted hover:text-primary" @click="starMessage">
                 <el-icon class="mr-1"><Star /></el-icon>收藏
               </el-button>
             </div>
@@ -180,7 +180,7 @@
           />
           <div class="flex items-center gap-2">
             <el-tooltip content="语音输入">
-              <el-icon class="text-xl text-text-muted hover:text-primary cursor-pointer p-2"><Microphone /></el-icon>
+              <el-icon class="text-xl text-text-muted hover:text-primary cursor-pointer p-2" @click="ElMessage.info('语音输入功能开发中...')"><Microphone /></el-icon>
             </el-tooltip>
             <el-button type="primary" :icon="Promotion" :disabled="!inputMessage.trim() || isLoading" @click="sendMessage">
               发送
@@ -198,6 +198,8 @@
 <script setup lang="ts">
 import { ref, nextTick, onMounted } from 'vue'
 import { useUserStore } from '@/stores/user'
+import { ElMessage } from 'element-plus'
+import { aiApi } from '@/api'
 import {
   Plus,
   ChatRound,
@@ -275,7 +277,7 @@ const scrollToBottom = async () => {
   }
 }
 
-const sendMessage = () => {
+const sendMessage = async () => {
   if (!inputMessage.value.trim() || isLoading.value) return
 
   messages.value.push({
@@ -290,16 +292,31 @@ const sendMessage = () => {
   isLoading.value = true
   scrollToBottom()
 
-  setTimeout(() => {
+  try {
+    const result = await aiApi.chat({
+      message: userQuestion,
+      userDNA: userStore.userInfo.learningType,
+      emotion: userStore.userInfo.emotionState,
+      context: '',
+    })
     isLoading.value = false
     messages.value.push({
       isUser: false,
       type: 'text',
-      content: `好的，我来为你详细解答"${userQuestion}"这个问题。\n\n基于你的"理解驱动型"学习人格，我会用图像化的方式来解释：\n\n想象一下...\n\n（这里会根据具体问题生成个性化的解释，使用简短句子和图像类比）`,
+      content: result.response || '抱歉，AI暂时无法回复，请稍后再试。',
       time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
     })
     scrollToBottom()
-  }, 1500)
+  } catch {
+    isLoading.value = false
+    messages.value.push({
+      isUser: false,
+      type: 'text',
+      content: '抱歉，后端服务未启动，请检查服务状态。',
+      time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+    })
+    scrollToBottom()
+  }
 }
 
 const sendQuickMessage = (text: string) => {
@@ -336,7 +353,38 @@ const clearChat = () => {
 }
 
 const copyMessage = (content: string) => {
-  navigator.clipboard.writeText(content)
+  navigator.clipboard.writeText(content).then(() => {
+    ElMessage.success('已复制到剪贴板')
+  }).catch(() => {
+    ElMessage.warning('复制失败，请手动复制')
+  })
+}
+
+const regenerateMessage = async () => {
+  isLoading.value = true
+  try {
+    const result = await aiApi.chat({
+      message: '请换一个角度重新解释上一个问题',
+      userDNA: userStore.userInfo.learningType,
+      emotion: userStore.userInfo.emotionState,
+      context: '',
+    })
+    isLoading.value = false
+    messages.value.push({
+      isUser: false,
+      type: 'text',
+      content: result.response || '抱歉，AI暂时无法回复。',
+      time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+    })
+    scrollToBottom()
+  } catch {
+    isLoading.value = false
+    ElMessage.error('后端服务未启动，请检查服务状态')
+  }
+}
+
+const starMessage = () => {
+  ElMessage.success('已收藏到知识库')
 }
 
 onMounted(() => {

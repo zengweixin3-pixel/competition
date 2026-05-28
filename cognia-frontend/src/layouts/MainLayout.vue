@@ -5,7 +5,7 @@
       <!-- Logo -->
       <div class="p-6 flex items-center gap-3">
         <div class="w-10 h-10 rounded-xl bg-gradient-primary flex items-center justify-center">
-          <el-icon class="text-white text-xl"><Brain /></el-icon>
+          <el-icon class="text-white text-xl"><Star /></el-icon>
         </div>
         <div>
           <h1 class="font-bold text-lg text-text-primary">Cognia</h1>
@@ -25,7 +25,7 @@
           >
             <el-icon class="text-lg"><component :is="item.icon" /></el-icon>
             <span class="font-medium">{{ item.name }}</span>
-            <span v-if="item.badge" class="ml-auto px-2 py-0.5 text-xs bg-accent-pink text-white rounded-full">{{ item.badge }}</span>
+            <span v-if="item.badge" class="ml-auto px-2 py-0.5 text-xs bg-accent-pink/30 text-accent-pink rounded-full font-medium">{{ item.badge }}</span>
           </router-link>
         </div>
       </nav>
@@ -44,8 +44,8 @@
 
       <!-- 用户信息 -->
       <div class="p-4 border-t border-dark-border">
-        <div class="flex items-center gap-3">
-          <el-avatar :size="40" src="https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png" />
+        <div class="flex items-center gap-3 cursor-pointer" @click="$router.push('/settings')">
+          <el-avatar :size="40" :src="userStore.avatarUrl" />
           <div class="flex-1 min-w-0">
             <div class="font-medium text-text-primary truncate">{{ userStore.userInfo.username }}</div>
             <div class="text-xs text-text-muted truncate">高数期末冲刺中...</div>
@@ -65,17 +65,68 @@
         </div>
         <div class="flex items-center gap-4">
           <div class="relative">
-            <el-input
-              v-model="searchQuery"
-              placeholder="搜索知识点、问题或教材"
-              class="w-80"
-              :prefix-icon="Search"
-            />
+            <el-popover
+              :visible="searchResults.length > 0 && searchQuery.trim().length > 0"
+              placement="bottom-start"
+              :width="320"
+              trigger="manual"
+            >
+              <template #reference>
+                <el-input
+                  v-model="searchQuery"
+                  placeholder="搜索知识点、问题或教材"
+                  class="w-80"
+                  :prefix-icon="Search"
+                  @input="handleSearch(searchQuery)"
+                  @clear="handleSearch('')"
+                />
+              </template>
+              <div class="space-y-2 max-h-80 overflow-y-auto">
+                <div
+                  v-for="item in searchResults"
+                  :key="item.id"
+                  class="flex items-center gap-2 p-2 rounded-lg hover:bg-dark-bg/50 cursor-pointer"
+                  @click="$router.push(item.path); searchQuery = ''; handleSearch('')"
+                >
+                  <el-tag size="small" effect="dark">{{ item.type }}</el-tag>
+                  <span class="text-sm text-text-primary flex-1">{{ item.title }}</span>
+                </div>
+              </div>
+            </el-popover>
           </div>
-          <el-badge :value="3" class="cursor-pointer">
-            <el-icon class="text-xl text-text-secondary hover:text-text-primary"><Bell /></el-icon>
-          </el-badge>
-          <el-avatar :size="36" src="https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png" />
+          <el-popover
+            v-model:visible="notificationVisible"
+            placement="bottom-end"
+            :width="360"
+            trigger="click"
+          >
+            <template #reference>
+              <el-badge :value="unreadCount" :hidden="unreadCount === 0" class="cursor-pointer">
+                <el-icon class="text-xl text-text-secondary hover:text-text-primary"><Bell /></el-icon>
+              </el-badge>
+            </template>
+            <div class="space-y-2 max-h-96 overflow-y-auto">
+              <div class="flex items-center justify-between mb-2">
+                <span class="font-bold text-text-primary">消息通知</span>
+                <el-button link size="small" @click="markAllAsRead()">全部已读</el-button>
+              </div>
+              <div
+                v-for="n in notifications"
+                :key="n.id"
+                class="p-3 rounded-lg cursor-pointer transition-colors"
+                :class="n.read ? 'bg-dark-bg/30' : 'bg-primary/10 border border-primary/20'"
+                @click="markAsRead(n.id); if (n.link) $router.push(n.link); notificationVisible = false"
+              >
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="w-2 h-2 rounded-full flex-shrink-0" :class="n.read ? 'bg-text-muted' : 'bg-primary'"></span>
+                  <span class="font-medium text-sm text-text-primary">{{ n.title }}</span>
+                  <span class="text-xs text-text-muted ml-auto">{{ n.time }}</span>
+                </div>
+                <p class="text-xs text-text-secondary ml-4">{{ n.message }}</p>
+              </div>
+            </div>
+          </el-popover>
+          <el-avatar :size="36" :src="userStore.avatarUrl" class="cursor-pointer" @click="$router.push('/settings')" />
         </div>
       </header>
 
@@ -88,9 +139,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { useSearch } from '@/composables/useSearch'
+import { useNotification } from '@/composables/useNotification'
 import {
   HomeFilled,
   ChatDotRound,
@@ -105,11 +158,14 @@ import {
   ArrowRight,
   Bell,
   Search,
+  Star,
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const userStore = useUserStore()
-const searchQuery = ref('')
+const { query: searchQuery, results: searchResults, search: handleSearch } = useSearch()
+const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotification()
+const notificationVisible = ref(false)
 
 const menuItems = [
   { name: '首页', path: '/', icon: 'HomeFilled' },
@@ -132,8 +188,15 @@ const pageTitles: Record<string, { title: string; subtitle: string }> = {
   '/emotion': { title: '情绪中心', subtitle: '记录心情，AI会更懂你哦 💜' },
   '/study-plan': { title: '学习计划', subtitle: '制定你的专属学习计划' },
   '/report': { title: '学习报告', subtitle: '查看你的学习数据分析' },
+  '/knowledge': { title: '知识库', subtitle: '系统化知识管理，构建学习体系' },
+  '/achievements': { title: '成就中心', subtitle: '每一个里程碑都值得骄傲' },
+  '/settings': { title: '设置中心', subtitle: '个性化你的学习体验' },
 }
 
 const pageTitle = computed(() => pageTitles[route.path]?.title || 'Cognia')
 const pageSubtitle = computed(() => pageTitles[route.path]?.subtitle || '')
+
+onMounted(() => {
+  userStore.loadUser()
+})
 </script>
