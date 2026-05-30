@@ -1,19 +1,13 @@
 <template>
   <div class="space-y-6" v-loading="loading">
     <!-- 页面标题 -->
-    <div class="flex items-center justify-between">
-      <div>
-        <h2 class="text-2xl font-bold text-text-primary">学习报告</h2>
-        <p class="text-text-muted mt-1">全面的学习数据分析，见证你的成长</p>
-      </div>
-      <div class="flex gap-3">
-        <el-button size="large" @click="exportReport">
-          <el-icon class="mr-2"><Download /></el-icon>导出报告
-        </el-button>
-        <el-button type="primary" size="large" @click="shareReport">
-          <el-icon class="mr-2"><Share /></el-icon>分享
-        </el-button>
-      </div>
+    <div class="flex items-center justify-end gap-3">
+      <el-button size="large" @click="exportReport">
+        <el-icon class="mr-2"><Download /></el-icon>导出报告
+      </el-button>
+      <el-button type="primary" size="large" @click="shareReport">
+        <el-icon class="mr-2"><Share /></el-icon>分享
+      </el-button>
     </div>
 
     <!-- 核心数据概览 -->
@@ -218,7 +212,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
 import { LineChart, BarChart, PieChart, RadarChart } from 'echarts/charts'
@@ -234,10 +228,10 @@ import {
   ChatDotRound,
   Warning,
   Trophy,
-  Fire,
+  Lightning,
   Star,
   Medal,
-  Target,
+  Aim,
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { studyApi } from '@/api'
@@ -536,25 +530,79 @@ const mistakeImprovementOption = {
 
 const achievements = ref([
   { id: 1, name: '学习达人', desc: '累计学习100小时', icon: 'Trophy', unlocked: true, progress: 100, bgClass: 'bg-amber-500/20', iconClass: 'text-amber-400' },
-  { id: 2, name: '连续打卡', desc: '连续学习21天', icon: 'Fire', unlocked: true, progress: 100, bgClass: 'bg-orange-500/20', iconClass: 'text-orange-400' },
-  { id: 3, name: '错题克星', desc: '掌握100道错题', icon: 'Target', unlocked: false, progress: 89, bgClass: 'bg-primary/20', iconClass: 'text-primary' },
+  { id: 2, name: '连续打卡', desc: '连续学习21天', icon: 'Lightning', unlocked: true, progress: 100, bgClass: 'bg-orange-500/20', iconClass: 'text-orange-400' },
+  { id: 3, name: '错题克星', desc: '掌握100道错题', icon: 'Aim', unlocked: false, progress: 89, bgClass: 'bg-primary/20', iconClass: 'text-primary' },
   { id: 4, name: '全能学霸', desc: '所有学科正确率超80%', icon: 'Medal', unlocked: false, progress: 75, bgClass: 'bg-accent-purple/20', iconClass: 'text-accent-purple' },
 ])
 
-const aiSummary = ref({
-  highlights: [
-    '本月学习时长达到126.5小时，较上月增长15%，表现优异',
-    '连续23天坚持学习，养成了良好的学习习惯',
-    '高数成绩提升明显，正确率从65%提升到78%',
-    '错题改进率达到76%，说明复习方法有效',
-  ],
-  suggestions: [
-    '线性代数学习时间偏少，建议增加投入',
-    '上午时段学习效率较低，可以尝试调整学习计划',
-    '概念混淆类错题较多，建议加强基础概念理解',
-    '深夜学习时间占比过高，注意保证充足睡眠',
-  ],
-  coachMessage: '小明同学，这个月你的学习表现非常出色！特别是连续23天的坚持，让我看到了你的毅力。高数的进步也很明显，继续保持！不过要注意平衡各科的学习时间，线性代数还需要加强。记住，学习是一场马拉松，保持节奏比冲刺更重要。加油！',
+const aiSummary = computed(() => {
+  const o = overview.value
+  const m = mistakeStats.value
+  const username = JSON.parse(localStorage.getItem('cognia-user') || '{}').username || '同学'
+
+  // 根据真实数据动态生成本月亮点
+  const highlights: string[] = []
+  if (o.totalHours > 0) {
+    highlights.push(`本月学习时长达到${o.totalHours}小时${o.hoursChange > 0 ? `，较上月增长${o.hoursChange}%` : ''}`)
+  }
+  if (o.streak > 0) {
+    highlights.push(`连续${o.streak}天坚持学习，养成了良好的学习习惯`)
+  }
+  if (o.completedTasks > 0) {
+    highlights.push(`完成了${o.completedTasks}个学习任务，计划执行力值得肯定`)
+  }
+  if (m.improvement > 0) {
+    highlights.push(`错题改进率达到${m.improvement}%，复习方法有效`)
+  }
+  if (o.accuracy > 60) {
+    highlights.push(`平均正确率${o.accuracy}%，基础知识掌握扎实`)
+  }
+  if (highlights.length === 0) {
+    highlights.push('开始使用Cognia记录你的学习之旅吧')
+  }
+
+  // 根据真实数据动态生成改进建议
+  const suggestions: string[] = []
+  if (o.avgDaily < 2) {
+    suggestions.push('日均学习时间偏少，建议每天至少安排2小时学习')
+  }
+  if (o.streak < 3) {
+    suggestions.push('学习连续性有待提升，试着每天坚持至少30分钟')
+  }
+  if (o.accuracy < 60) {
+    suggestions.push('正确率较低，建议加强基础概念理解和错题复习')
+  }
+  if (m.total > 20 && (m.mastered || 0) < (m.total || 1) * 0.5) {
+    suggestions.push(`还有${(m.total || 1) - (m.mastered || 0)}道错题待复习，建议安排时间集中攻克`)
+  }
+  if (o.completedTasks > 0 && o.completedTasks < 5) {
+    suggestions.push('任务完成量不多，可以尝试将大任务分解为小任务')
+  }
+  if (suggestions.length === 0) {
+    suggestions.push('继续保持当前学习节奏，稳扎稳打')
+  }
+
+  // 根据真实数据动态生成教练寄语
+  let coachMessage = `${username}同学，`
+  if (o.streak >= 7) {
+    coachMessage += `连续${o.streak}天的坚持非常了不起！`
+  }
+  if (o.totalHours > 50) {
+    coachMessage += `本月${o.totalHours}小时的学习投入令人印象深刻。`
+  } else if (o.totalHours > 0) {
+    coachMessage += `本月学习了${o.totalHours}小时，每一步都是进步。`
+  } else {
+    coachMessage += '新的学习旅程刚刚开始。'
+  }
+  if (m.mastered && m.total && m.mastered > m.total * 0.5) {
+    coachMessage += `错题攻克效果显著，已掌握${Math.round((m.mastered / m.total) * 100)}%的错题。`
+  }
+  if (o.accuracy > 70) {
+    coachMessage += '正确率表现不错，继续保持对知识的深入理解。'
+  }
+  coachMessage += '记住，学习是一场马拉松，保持节奏比冲刺更重要。加油！'
+
+  return { highlights, suggestions, coachMessage }
 })
 
 const exportReport = () => {

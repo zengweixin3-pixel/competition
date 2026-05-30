@@ -1,7 +1,7 @@
 <template>
-  <div class="min-h-screen bg-dark-bg flex">
+  <div class="h-screen overflow-hidden bg-dark-bg flex">
     <!-- 侧边栏 -->
-    <aside class="w-64 bg-dark-card border-r border-dark-border flex flex-col">
+    <aside class="sticky top-0 h-screen w-64 shrink-0 bg-dark-card border-r border-dark-border flex flex-col">
       <!-- Logo -->
       <div class="p-6 flex items-center gap-3">
         <div class="w-10 h-10 rounded-xl bg-gradient-primary flex items-center justify-center">
@@ -14,7 +14,7 @@
       </div>
 
       <!-- 导航菜单 -->
-      <nav class="flex-1 px-4 py-4">
+      <nav class="flex-1 min-h-0 overflow-y-auto px-4 py-4">
         <div class="space-y-1">
           <router-link
             v-for="item in menuItems"
@@ -44,21 +44,33 @@
 
       <!-- 用户信息 -->
       <div class="p-4 border-t border-dark-border">
-        <div class="flex items-center gap-3 cursor-pointer" @click="$router.push('/settings')">
-          <el-avatar :size="40" :src="userStore.avatarUrl" />
-          <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-3">
+          <el-avatar :size="40" :src="userStore.avatarUrl" class="cursor-pointer" @click="$router.push('/settings')" />
+          <div class="flex-1 min-w-0 cursor-pointer" @click="$router.push('/settings')">
             <div class="font-medium text-text-primary truncate">{{ userStore.userInfo.username }}</div>
-            <div class="text-xs text-text-muted truncate">高数期末冲刺中...</div>
+            <div class="text-xs text-text-muted truncate">{{ userStore.userInfo.learningType || '学习中...' }}</div>
           </div>
-          <el-icon class="text-text-muted cursor-pointer hover:text-text-primary"><ArrowRight /></el-icon>
+          <el-popover placement="bottom-end" :width="140" trigger="click">
+            <template #reference>
+              <el-icon class="text-text-muted cursor-pointer hover:text-text-primary"><ArrowRight /></el-icon>
+            </template>
+            <div class="space-y-1">
+              <div class="px-3 py-2 text-sm text-text-primary cursor-pointer hover:bg-dark-border rounded-lg" @click="$router.push('/settings')">
+                <el-icon class="mr-2"><Setting /></el-icon>设置
+              </div>
+              <div class="px-3 py-2 text-sm text-rose-400 cursor-pointer hover:bg-dark-border rounded-lg" @click="handleLogout">
+                <el-icon class="mr-2"><SwitchButton /></el-icon>退出登录
+              </div>
+            </div>
+          </el-popover>
         </div>
       </div>
     </aside>
 
     <!-- 主内容区 -->
-    <main class="flex-1 flex flex-col min-h-screen overflow-hidden">
+    <main class="flex-1 flex flex-col h-screen overflow-hidden">
       <!-- 顶部栏 -->
-      <header class="h-16 bg-dark-card/50 backdrop-blur-xl border-b border-dark-border flex items-center justify-between px-8">
+      <header class="sticky top-0 z-20 h-16 bg-dark-card/80 backdrop-blur-xl border-b border-dark-border flex items-center justify-between px-8">
         <div>
           <h2 class="text-xl font-bold text-text-primary">{{ pageTitle }}</h2>
           <p class="text-sm text-text-muted">{{ pageSubtitle }}</p>
@@ -159,10 +171,15 @@ import {
   Bell,
   Search,
   Star,
+  SwitchButton,
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const userStore = useUserStore()
+
+const yesterday = new Date()
+yesterday.setDate(yesterday.getDate() - 1)
+const yesterdayStr = `${yesterday.getMonth() + 1}月${yesterday.getDate()}日`
 const { query: searchQuery, results: searchResults, search: handleSearch } = useSearch()
 const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotification()
 const notificationVisible = ref(false)
@@ -170,7 +187,7 @@ const notificationVisible = ref(false)
 const menuItems = [
   { name: '首页', path: '/', icon: 'HomeFilled' },
   { name: 'AI学习助手', path: '/ai-chat', icon: 'ChatDotRound' },
-  { name: '学习人格', path: '/learning-dna', icon: 'User', badge: 'NEW' },
+  { name: '学习人格', path: '/learning-dna', icon: 'User' },
   { name: '错题分析', path: '/mistake', icon: 'DocumentDelete' },
   { name: '知识库', path: '/knowledge', icon: 'Collection' },
   { name: '情绪中心', path: '/emotion', icon: 'DataLine' },
@@ -180,21 +197,40 @@ const menuItems = [
   { name: '设置中心', path: '/settings', icon: 'Setting' },
 ]
 
-const pageTitles: Record<string, { title: string; subtitle: string }> = {
-  '/': { title: '晚上好，小明同学 👋', subtitle: '今天是你改变学习习惯的 第 23 天' },
-  '/ai-chat': { title: 'AI学习助手', subtitle: '随时为你解答学习问题' },
-  '/learning-dna': { title: '学习人格', subtitle: '了解你的学习DNA' },
-  '/mistake': { title: '错题分析', subtitle: '分析错题，精准提升' },
-  '/emotion': { title: '情绪中心', subtitle: '记录心情，AI会更懂你哦 💜' },
-  '/study-plan': { title: '学习计划', subtitle: '制定你的专属学习计划' },
-  '/report': { title: '学习报告', subtitle: '查看你的学习数据分析' },
-  '/knowledge': { title: '知识库', subtitle: '系统化知识管理，构建学习体系' },
-  '/achievements': { title: '成就中心', subtitle: '每一个里程碑都值得骄傲' },
-  '/settings': { title: '设置中心', subtitle: '个性化你的学习体验' },
-}
+const pageTitle = computed(() => {
+  if (route.path === '/') {
+    const name = userStore.userInfo.username || '同学'
+    const days = userStore.userInfo.continuousDays || 0
+    return `晚上好，${name} 👋`
+  }
+  const map: Record<string, string> = {
+    '/ai-chat': 'AI学习助手', '/learning-dna': '学习人格', '/mistake': '错题分析',
+    '/emotion': '情绪中心', '/study-plan': '学习计划', '/report': '学习报告',
+    '/knowledge': '知识库', '/achievements': '成就中心', '/settings': '设置中心',
+  }
+  return map[route.path] || 'Cognia'
+})
 
-const pageTitle = computed(() => pageTitles[route.path]?.title || 'Cognia')
-const pageSubtitle = computed(() => pageTitles[route.path]?.subtitle || '')
+const pageSubtitle = computed(() => {
+  if (route.path === '/') {
+    const days = userStore.userInfo.continuousDays || 0
+    return days > 0 ? `今天是你改变学习习惯的第 ${days} 天` : '新的一天，开始学习吧'
+  }
+  const map: Record<string, string> = {
+    '/ai-chat': '随时为你解答学习问题', '/learning-dna': '了解你的学习DNA',
+    '/mistake': '分析错题，精准提升', '/emotion': '记录心情，AI会更懂你哦 💜',
+    '/study-plan': '制定你的专属学习计划', '/report': `昨日学习报告（${yesterdayStr}）`,
+    '/knowledge': '系统化知识管理，构建学习体系', '/achievements': '每一个里程碑都值得骄傲',
+    '/settings': '个性化你的学习体验',
+  }
+  return map[route.path] || ''
+})
+
+const handleLogout = () => {
+  localStorage.removeItem('cognia-token')
+  localStorage.removeItem('cognia-user')
+  window.location.href = '/login'
+}
 
 onMounted(() => {
   userStore.loadUser()

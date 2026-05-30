@@ -1,523 +1,643 @@
 <template>
   <div class="space-y-6" v-loading="loading">
-    <!-- 第一行：AI学习人格 + 今日学习概览 + AI今日建议 -->
-    <div class="grid grid-cols-12 gap-6">
-      <!-- AI学习人格 -->
-      <div class="col-span-4 card-gradient rounded-2xl p-6">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="font-bold text-text-primary">AI学习人格</h3>
-          <el-icon class="text-text-muted"><ArrowRight /></el-icon>
+    <section class="grid grid-cols-1 gap-5 xl:grid-cols-[0.92fr_2.08fr]">
+      <div class="card-gradient rounded-[28px] p-5">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <p class="text-sm uppercase tracking-[0.22em] text-text-muted">Learning DNA</p>
+            <h2 class="mt-3 text-2xl font-bold text-text-primary">
+              {{ userStore.learningDNA.type || '待分析' }}
+            </h2>
+            <p v-if="userStore.learningDNA.description" class="mt-3 text-sm leading-6 text-text-secondary">{{ userStore.learningDNA.description }}</p>
+          </div>
+          <el-button link type="primary" @click="router.push('/learning-dna')">
+            查看详情
+          </el-button>
         </div>
-        <div class="flex items-center gap-6">
-          <div class="w-32 h-32">
-            <v-chart class="w-full h-full" :option="radarOption" autoresize />
-          </div>
-          <div class="flex-1">
-            <div class="text-sm text-text-muted mb-1">你的学习人格类型</div>
-            <div class="text-xl font-bold gradient-text mb-2">{{ userStore.learningDNA.type }}</div>
-            <div class="inline-flex items-center gap-1 px-3 py-1 bg-accent-purple/20 text-accent-purple text-sm rounded-full mb-3">
-              <el-icon><Moon /></el-icon>
-              <span>夜间高效型</span>
-            </div>
-            <p class="text-sm text-text-secondary leading-relaxed">
-              你擅长深入理解知识，喜欢探索原理，在安静的环境中效率更高，适合深度学习。
-            </p>
-            <el-button type="primary" class="mt-4" size="small" @click="router.push('/learning-dna')">
-              查看完整分析 <el-icon class="ml-1"><ArrowRight /></el-icon>
-            </el-button>
-          </div>
+
+        <div class="mt-5 h-56">
+          <v-chart class="h-full w-full" :option="radarOption" autoresize />
+        </div>
+
+        <div class="mt-4 flex flex-wrap gap-2">
+          <el-tag
+            v-for="tag in userStore.learningDNA.tags.slice(0, 4)"
+            :key="tag"
+            size="small"
+            effect="plain"
+          >
+            {{ tag }}
+          </el-tag>
         </div>
       </div>
 
-      <!-- 今日学习概览 -->
-      <div class="col-span-5 card-gradient rounded-2xl p-6">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="font-bold text-text-primary">今日学习概览</h3>
-        </div>
-        <div class="grid grid-cols-4 gap-4 mb-4">
-          <div class="text-center">
-            <div class="text-2xl font-bold text-text-primary">{{ stats.studyTime }}<span class="text-sm font-normal text-text-muted">h</span></div>
-            <div class="text-xs text-text-muted mt-1">学习时长</div>
-            <div class="text-xs text-emerald-400 mt-1">↑ {{ stats.studyTimeChange }}%</div>
-          </div>
-          <div class="text-center">
-            <div class="text-2xl font-bold text-text-primary">{{ stats.focusScore }}<span class="text-sm font-normal text-text-muted">分</span></div>
-            <div class="text-xs text-text-muted mt-1">专注度</div>
-            <div class="text-xs text-emerald-400 mt-1">↑ {{ stats.focusScoreChange }}%</div>
-          </div>
-          <div class="text-center">
-            <div class="text-2xl font-bold text-text-primary">{{ stats.completedTasks }}/{{ stats.totalTasks }}</div>
-            <div class="text-xs text-text-muted mt-1">完成任务</div>
-            <div class="text-xs text-emerald-400 mt-1">↑ {{ stats.tasksChange }}%</div>
-          </div>
-          <div class="text-center">
-            <div class="text-2xl font-bold text-text-primary">{{ stats.accuracy }}<span class="text-sm font-normal text-text-muted">%</span></div>
-            <div class="text-xs text-text-muted mt-1">正确率</div>
-            <div class="text-xs text-rose-400 mt-1">↓ {{ Math.abs(stats.accuracyChange) }}%</div>
-          </div>
-        </div>
-        <div class="h-32">
-          <v-chart class="w-full h-full" :option="focusChartOption" autoresize />
-        </div>
-      </div>
+      <div class="relative overflow-hidden rounded-[32px] border border-primary/20 bg-[#0d1324] p-5">
+        <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(99,102,241,0.22),transparent_32%),radial-gradient(circle_at_bottom_left,rgba(236,72,153,0.12),transparent_34%)]" />
 
-      <!-- AI今日建议 -->
-      <div class="col-span-3 card-gradient rounded-2xl p-6">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="font-bold text-text-primary">AI今日建议</h3>
-          <el-icon class="text-text-muted"><More /></el-icon>
-        </div>
-        <div class="bg-gradient-to-br from-primary/10 to-accent-purple/10 rounded-xl p-4 border border-primary/20 mb-4">
-          <div class="flex items-start gap-3">
-            <div class="w-10 h-10 rounded-full bg-gradient-primary flex items-center justify-center flex-shrink-0">
-              <el-icon class="text-white"><ChatDotRound /></el-icon>
-            </div>
+        <div class="relative flex flex-col gap-6">
+          <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <p class="text-sm text-text-secondary leading-relaxed">
-                晚上是你的高效学习期，建议安排难度较高的知识点学习哦！
-              </p>
+              <p class="text-sm uppercase tracking-[0.22em] text-text-muted">Today Snapshot</p>
+              <h2 class="mt-3 text-2xl font-bold text-text-primary">今日学习概览</h2>
+            </div>
+            <div class="rounded-2xl border border-emerald-400/25 bg-emerald-400/10 px-4 py-2 text-xs text-emerald-300">
+              Live
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3 xl:grid-cols-4">
+            <div
+              v-for="card in overviewCards"
+              :key="card.label"
+              class="rounded-3xl border border-white/6 bg-white/5 p-3.5 shadow-[0_18px_40px_rgba(10,14,26,0.26)] backdrop-blur"
+            >
+              <p class="text-xs uppercase tracking-[0.18em] text-text-muted">{{ card.label }}</p>
+              <p class="mt-3 text-2xl font-bold text-text-primary">{{ card.value }}</p>
+            </div>
+          </div>
+
+          <div class="rounded-[28px] border border-white/6 bg-[#10192f]/88 p-4">
+            <div class="flex items-center justify-between gap-4">
+              <div>
+                <h3 class="text-lg font-bold text-text-primary">近 7 天学习趋势</h3>
+              </div>
+              <el-tag size="small" effect="plain">7D</el-tag>
+            </div>
+            <div class="mt-3 h-52">
+              <v-chart class="h-full w-full" :option="studyTrendOption" autoresize />
             </div>
           </div>
         </div>
-        <div class="space-y-3">
-          <div class="flex items-center gap-2 text-sm text-text-secondary">
-            <el-icon class="text-primary"><CircleCheck /></el-icon>
-            <span>建议学习：高数 重点章节 7.2</span>
+      </div>
+    </section>
+
+    <section class="grid grid-cols-1 gap-5 xl:grid-cols-[1.55fr_0.9fr]">
+      <div class="relative overflow-hidden rounded-[32px] border border-primary/20 bg-[#0a111f]">
+        <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(99,102,241,0.18),transparent_28%),radial-gradient(circle_at_88%_10%,rgba(6,182,212,0.16),transparent_24%),radial-gradient(circle_at_80%_100%,rgba(236,72,153,0.12),transparent_30%)]" />
+
+        <div class="relative flex h-full flex-col p-5">
+          <div class="flex flex-col gap-4 border-b border-white/8 pb-5 lg:flex-row lg:items-center lg:justify-between">
+            <div class="flex items-center gap-4">
+              <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-primary shadow-glow">
+                <span class="text-base font-bold text-white">AI</span>
+              </div>
+              <div>
+                <div class="flex items-center gap-3">
+                  <h3 class="text-xl font-bold text-text-primary">AI 学习助手</h3>
+                  <span class="flex items-center gap-2 text-xs text-emerald-300">
+                    <span class="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.9)]" />
+                    在线
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2">
+              <el-tag v-for="tag in aiTags" :key="tag" size="small" effect="dark" class="!border-0 !bg-white/10">
+                {{ tag }}
+              </el-tag>
+              <el-button type="primary" plain @click="router.push('/ai-chat')">
+                深入咨询
+                <el-icon class="ml-1"><ArrowRight /></el-icon>
+              </el-button>
+            </div>
           </div>
-          <div class="flex items-center gap-2 text-sm text-text-secondary">
-            <el-icon class="text-primary"><Clock /></el-icon>
-            <span>最佳时间：19:30 - 21:30</span>
+
+          <div class="mt-4 h-[360px] space-y-3 overflow-y-auto pr-1">
+            <div
+              v-for="(message, index) in chatMessages"
+              :key="index"
+              class="flex gap-3"
+              :class="message.isUser ? 'flex-row-reverse' : ''"
+            >
+              <div class="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-sm font-bold"
+                :class="message.isUser ? 'bg-white/10 text-text-primary' : 'bg-gradient-primary text-white shadow-glow'">
+                {{ message.isUser ? '我' : 'AI' }}
+              </div>
+
+              <div class="max-w-[84%]" :class="message.isUser ? 'text-right' : ''">
+                <div class="mb-2 flex items-center gap-2 text-xs text-text-muted" :class="message.isUser ? 'flex-row-reverse' : ''">
+                  <span>{{ message.isUser ? '你' : 'AI 学习助手' }}</span>
+                  <span>{{ message.time }}</span>
+                </div>
+                <div
+                  class="inline-block rounded-[24px] px-4 py-3 text-left text-sm leading-6"
+                  :class="message.isUser ? 'bg-primary text-white shadow-[0_12px_24px_rgba(99,102,241,0.28)]' : 'border border-white/6 bg-white/6 text-text-primary'"
+                >
+                  <p class="whitespace-pre-wrap">{{ message.content }}</p>
+                </div>
+              </div>
+            </div>
           </div>
-          <div class="flex items-center gap-2 text-sm text-text-secondary">
-            <el-icon class="text-primary"><Timer /></el-icon>
-            <span>学习时长：90 分钟</span>
+
+          <div class="mt-5 border-t border-white/8 pt-4">
+            <div class="flex flex-wrap gap-2">
+              <button
+                v-for="prompt in quickPrompts"
+                :key="prompt"
+                type="button"
+                class="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs text-text-secondary transition hover:border-primary/40 hover:bg-primary/10 hover:text-text-primary"
+                @click="fillQuickPrompt(prompt)"
+              >
+                {{ prompt }}
+              </button>
+            </div>
+
+            <div class="mt-4 flex items-center gap-3 rounded-[24px] border border-white/10 bg-white/5 p-3">
+              <el-input
+                v-model="chatInput"
+                class="flex-1"
+                placeholder="输入你的学习问题..."
+                @keyup.enter="sendMessage"
+              />
+              <el-button type="primary" :loading="sending" @click="sendMessage">
+                发送
+                <el-icon class="ml-1"><Promotion /></el-icon>
+              </el-button>
+            </div>
           </div>
         </div>
-        <el-button type="primary" class="w-full mt-4" @click="router.push('/study-plan')">
-          开始学习计划
+      </div>
+
+      <div class="card-gradient rounded-[30px] p-5">
+        <div class="flex items-center justify-between gap-4">
+          <div>
+            <h3 class="text-lg font-bold text-text-primary">情绪中心</h3>
+          </div>
+          <el-button link type="primary" @click="router.push('/emotion')">查看记录</el-button>
+        </div>
+
+        <div class="mt-5 rounded-3xl border border-primary/15 bg-primary/8 px-4 py-3">
+            <p class="text-xs uppercase tracking-[0.16em] text-text-muted">Mood</p>
+          <p class="mt-2 text-base font-semibold text-text-primary">{{ currentEmotionLabel }}</p>
+        </div>
+
+        <div class="mt-4 grid grid-cols-2 gap-2.5">
+          <button
+            v-for="emotion in emotions"
+            :key="emotion.value"
+            type="button"
+            class="rounded-3xl border px-3.5 py-3.5 text-left transition"
+            :class="selectedEmotion === emotion.value ? 'border-primary bg-primary/12 shadow-[0_16px_30px_rgba(99,102,241,0.18)]' : 'border-white/8 bg-white/4 hover:border-white/16 hover:bg-white/8'"
+            @click="selectedEmotion = emotion.value"
+          >
+            <div class="text-3xl">{{ emotion.icon }}</div>
+            <p class="mt-3 text-sm font-semibold text-text-primary">{{ emotion.label }}</p>
+            <p class="mt-1 text-xs text-text-muted">{{ emotion.desc }}</p>
+          </button>
+        </div>
+
+        <el-input
+          v-model="moodNote"
+          class="mt-4"
+          type="textarea"
+          :rows="3"
+          placeholder="写下当前状态..."
+        />
+
+        <el-button class="mt-4 w-full" type="primary" :loading="savingEmotion" @click="saveMood">
+          保存当前情绪
         </el-button>
       </div>
-    </div>
+    </section>
 
-    <!-- 第二行：今日任务 + 错题本 + 学习数据 + 学习成就 -->
-    <div class="grid grid-cols-12 gap-6">
-      <!-- 今日任务 -->
-      <div class="col-span-3 card-gradient rounded-2xl p-6">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="font-bold text-text-primary">今日任务</h3>
-          <span class="text-sm text-text-muted">{{ completedTasks }}/{{ totalTasks }} 已完成</span>
-        </div>
-        <el-progress :percentage="taskProgress" :stroke-width="8" class="mb-4" :color="['#6366f1', '#a855f7']" />
-        <div class="space-y-3">
-          <div v-for="task in tasks" :key="task.id" class="flex items-center gap-3 p-3 rounded-xl bg-dark-bg/50">
-            <el-checkbox v-model="task.completed" size="large">
-              <span :class="task.completed ? 'line-through text-text-muted' : 'text-text-primary'">{{ task.name }}</span>
-            </el-checkbox>
-            <span class="ml-auto text-xs px-2 py-1 rounded" :class="getSubjectClass(task.subject)">{{ task.subject }}</span>
-            <span class="text-xs text-text-muted">{{ task.duration }}分钟</span>
+    <section class="grid grid-cols-1 gap-5 xl:grid-cols-2">
+      <div class="card-gradient rounded-[30px] p-5">
+        <div class="flex items-center justify-between gap-4">
+          <div>
+            <h3 class="text-lg font-bold text-text-primary">今日学习计划</h3>
           </div>
+          <el-tag type="primary">{{ stats.completedTasks }}/{{ stats.totalTasks }}</el-tag>
         </div>
-        <div class="mt-4 text-center">
-          <el-link type="primary" underline="never" @click="router.push('/study-plan')">查看全部任务 →</el-link>
-        </div>
-      </div>
 
-      <!-- 错题本 -->
-      <div class="col-span-3 card-gradient rounded-2xl p-6">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="font-bold text-text-primary">错题本</h3>
-          <span class="text-sm text-accent-pink">12 题待复习</span>
-        </div>
-        <div class="space-y-3">
-          <div v-for="(mistake, index) in mistakes" :key="index" class="p-3 rounded-xl bg-dark-bg/50 border-l-4" :class="mistake.borderColor">
-            <div class="flex items-center justify-between mb-2">
-              <span class="font-medium text-text-primary text-sm">{{ mistake.title }}</span>
-              <span class="text-xs px-2 py-0.5 rounded" :class="mistake.tagClass">{{ mistake.tag }}</span>
-            </div>
-            <div class="flex items-center gap-4 text-xs text-text-muted">
-              <span>{{ mistake.subject }}</span>
-              <span>错误 {{ mistake.count }} 次</span>
-            </div>
-          </div>
-        </div>
-        <div class="mt-4 text-center">
-          <el-link type="primary" underline="never" @click="router.push('/mistake')">查看全部错题 →</el-link>
-        </div>
-      </div>
-
-      <!-- 学习数据 -->
-      <div class="col-span-3 card-gradient rounded-2xl p-6">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="font-bold text-text-primary">学习数据</h3>
-          <el-dropdown>
-            <span class="text-sm text-text-muted cursor-pointer">近 7 天 <el-icon><ArrowDown /></el-icon></span>
-            <template #dropdown>
-              <el-dropdown-menu>
-                <el-dropdown-item command="7">近 7 天</el-dropdown-item>
-                <el-dropdown-item command="30">近 30 天</el-dropdown-item>
-              </el-dropdown-menu>
-            </template>
-          </el-dropdown>
-        </div>
-        <div class="h-40">
-          <v-chart class="w-full h-full" :option="studyDataOption" autoresize />
-        </div>
-      </div>
-
-      <!-- 学习成就 -->
-      <div class="col-span-3 card-gradient rounded-2xl p-6">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="font-bold text-text-primary">学习成就</h3>
-          <el-link type="primary" underline="never" @click="router.push('/achievements')">更多 ></el-link>
-        </div>
-        <div class="bg-gradient-to-br from-amber-500/20 to-orange-500/20 rounded-xl p-4 border border-amber-500/30 mb-4">
-          <div class="flex items-center gap-3">
-            <div class="w-12 h-12 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
-              <el-icon class="text-gray-900 text-xl"><Trophy /></el-icon>
-            </div>
-            <div>
-              <div class="font-bold text-text-primary">连续学习 7 天</div>
-              <div class="text-sm text-text-secondary">坚持就是胜利！</div>
-            </div>
-          </div>
-        </div>
-        <div class="space-y-3">
-          <div class="flex items-center gap-3 p-3 rounded-xl bg-dark-bg/50">
-            <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-              <el-icon class="text-primary"><View /></el-icon>
-            </div>
-            <div class="flex-1">
-              <div class="text-sm text-text-primary">专注达人</div>
-              <div class="text-xs text-text-muted">累计专注 20 小时</div>
-            </div>
-            <el-icon class="text-text-muted"><ArrowRight /></el-icon>
-          </div>
-          <div class="flex items-center gap-3 p-3 rounded-xl bg-dark-bg/50">
-            <div class="w-10 h-10 rounded-full bg-accent-purple/20 flex items-center justify-center">
-              <el-icon class="text-accent-purple"><DocumentChecked /></el-icon>
-            </div>
-            <div class="flex-1">
-              <div class="text-sm text-text-primary">错题克星</div>
-              <div class="text-xs text-text-muted">解决错题 50 道</div>
-            </div>
-            <el-icon class="text-text-muted"><ArrowRight /></el-icon>
-          </div>
-          <div class="flex items-center gap-3 p-3 rounded-xl bg-dark-bg/50">
-            <div class="w-10 h-10 rounded-full bg-accent-cyan/20 flex items-center justify-center">
-              <el-icon class="text-accent-cyan"><Calendar /></el-icon>
-            </div>
-            <div class="flex-1">
-              <div class="text-sm text-text-primary">计划大师</div>
-              <div class="text-xs text-text-muted">完成计划 10 次</div>
-            </div>
-            <el-icon class="text-text-muted"><ArrowRight /></el-icon>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 第三行：AI学习助手 + 情绪中心 -->
-    <div class="grid grid-cols-12 gap-6">
-      <!-- AI学习助手 -->
-      <div class="col-span-8 card-gradient rounded-2xl p-6">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="font-bold text-text-primary">AI学习助手</h3>
-          <div class="flex gap-2">
-            <el-tag v-for="tag in aiTags" :key="tag" size="small" effect="dark" class="cursor-pointer">{{ tag }}</el-tag>
-          </div>
-        </div>
-        <div class="bg-dark-bg/50 rounded-xl p-4 mb-4 h-48 overflow-y-auto">
-          <div v-for="(msg, index) in chatMessages" :key="index" class="flex gap-3 mb-4" :class="msg.isUser ? 'flex-row-reverse' : ''">
-            <el-avatar v-if="!msg.isUser" :size="36" class="bg-gradient-primary">
-              <el-icon class="text-white"><ChatDotRound /></el-icon>
-            </el-avatar>
-            <el-avatar v-else :size="36" :src="userStore.avatarUrl" />
-            <div class="max-w-[70%]" :class="msg.isUser ? 'text-right' : ''">
-              <div class="inline-block px-4 py-2 rounded-xl text-sm" :class="msg.isUser ? 'bg-primary text-white' : 'bg-dark-border text-text-primary'">
-                {{ msg.content }}
+        <div class="mt-4 space-y-3">
+          <div
+            v-for="task in todayTasks"
+            :key="task.id"
+            class="rounded-3xl border border-white/8 bg-white/5 p-3.5"
+          >
+            <div class="flex items-start justify-between gap-4">
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2">
+                  <span class="inline-flex h-8 w-8 items-center justify-center rounded-2xl"
+                    :class="task.completed ? 'bg-emerald-400/16 text-emerald-300' : 'bg-amber-400/12 text-amber-300'">
+                    {{ task.completed ? '已' : '待' }}
+                  </span>
+                  <div class="min-w-0">
+                    <p class="truncate text-sm font-semibold text-text-primary">{{ task.name }}</p>
+                    <p class="mt-1 text-xs text-text-muted">{{ task.subject }} · {{ task.duration }} 分钟</p>
+                  </div>
+                </div>
+                <p class="mt-3 text-sm leading-5 text-text-secondary line-clamp-2">{{ task.goal || '继续在学习计划页完善任务目标。' }}</p>
               </div>
-              <div class="text-xs text-text-muted mt-1">{{ msg.time }}</div>
+              <el-tag :type="task.completed ? 'success' : 'warning'">
+                {{ task.completed ? '已完成' : '待完成' }}
+              </el-tag>
             </div>
           </div>
-        </div>
-        <div class="flex gap-3">
-          <el-input v-model="chatInput" placeholder="输入你的问题..." class="flex-1" @keyup.enter="sendMessage">
-            <template #append>
-              <el-button type="primary" :icon="Promotion" @click="sendMessage" />
-            </template>
-          </el-input>
+
+          <el-empty v-if="todayTasks.length === 0" description="今天还没有学习计划" />
         </div>
       </div>
 
-      <!-- 情绪中心 -->
-      <div class="col-span-4 card-gradient rounded-2xl p-6">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="font-bold text-text-primary">情绪中心</h3>
-          <span class="text-sm text-text-muted">记录心情，AI会更懂你哦 💜</span>
-        </div>
-        <div class="flex justify-between mb-6">
-          <div v-for="emotion in emotions" :key="emotion.value" class="flex flex-col items-center gap-2 cursor-pointer group" @click="selectEmotion(emotion)">
-            <div class="w-12 h-12 rounded-full flex items-center justify-center text-2xl transition-all duration-300" :class="selectedEmotion === emotion.value ? 'bg-primary/30 scale-110' : 'bg-dark-bg/50 group-hover:bg-primary/20'">
-              {{ emotion.icon }}
-            </div>
-            <span class="text-xs text-text-muted">{{ emotion.label }}</span>
+      <div class="card-gradient rounded-[30px] p-5">
+        <div class="flex items-center justify-between gap-4">
+          <div>
+            <h3 class="text-lg font-bold text-text-primary">待复习错题</h3>
           </div>
+          <el-tag type="danger">{{ pendingMistakeCount }} 题待复习</el-tag>
         </div>
-        <div class="mb-4">
-          <div class="text-sm text-text-muted mb-2">今日心情记录</div>
-          <el-input v-model="moodNote" type="textarea" :rows="3" placeholder="今天学习有点累，但是收获也很大！" />
+
+        <div class="mt-4 space-y-3">
+          <div
+            v-for="mistake in dashboardMistakes"
+            :key="mistake.id"
+            class="rounded-3xl border border-white/8 bg-white/5 p-3.5"
+          >
+            <div class="flex items-start justify-between gap-4">
+              <div class="min-w-0">
+                <p class="truncate text-sm font-semibold text-text-primary">{{ mistake.title }}</p>
+                <div class="mt-2 flex flex-wrap gap-2 text-xs text-text-muted">
+                  <span>{{ mistake.subject }}</span>
+                  <span>·</span>
+                  <span>{{ mistake.mistakeType }}</span>
+                  <span>·</span>
+                  <span>错误 {{ mistake.errorCount }} 次</span>
+                </div>
+              </div>
+              <el-tag size="small" type="warning">{{ mistake.statusLabel }}</el-tag>
+            </div>
+          </div>
+
+          <el-empty v-if="dashboardMistakes.length === 0" description="暂无错题数据" />
         </div>
-        <el-button type="primary" class="w-full" @click="saveMood">保存心情</el-button>
       </div>
-    </div>
+    </section>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { use } from 'echarts/core'
+import { BarChart, RadarChart } from 'echarts/charts'
+import { GridComponent, LegendComponent, RadarComponent, TooltipComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
-import { RadarChart, LineChart, BarChart } from 'echarts/charts'
-import { GridComponent, TooltipComponent, LegendComponent, RadarComponent } from 'echarts/components'
 import VChart from 'vue-echarts'
-import { useUserStore } from '@/stores/user'
-import { studyApi } from '@/api'
-import {
-  ArrowRight,
-  Moon,
-  ChatDotRound,
-  CircleCheck,
-  Clock,
-  Timer,
-  More,
-  ArrowDown,
-  Trophy,
-  View,
-  DocumentChecked,
-  Calendar,
-  Promotion,
-} from '@element-plus/icons-vue'
+import { ArrowRight, Promotion } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import { aiApi, emotionApi, mistakeApi, studyApi } from '@/api'
+import { useUserStore } from '@/stores/user'
 
-use([CanvasRenderer, RadarChart, LineChart, BarChart, GridComponent, TooltipComponent, LegendComponent, RadarComponent])
+use([CanvasRenderer, RadarChart, BarChart, GridComponent, TooltipComponent, LegendComponent, RadarComponent])
+
+type StudyTask = {
+  id: number
+  name: string
+  goal: string
+  subject: string
+  duration: number
+  completed: boolean
+}
+
+type MistakeSummary = {
+  id: number
+  title: string
+  subject: string
+  mistakeType: string
+  errorCount: number
+  statusLabel: string
+}
+
+type ChatBubble = {
+  isUser: boolean
+  content: string
+  time: string
+}
 
 const userStore = useUserStore()
 const router = useRouter()
+
 const loading = ref(true)
+const sending = ref(false)
+const savingEmotion = ref(false)
+const pendingMistakeCount = ref(0)
+const todayTasks = ref<StudyTask[]>([])
+const dashboardMistakes = ref<MistakeSummary[]>([])
+const studyTrend = ref<Array<{ date: string; duration: number }>>([])
+const chatMessages = ref<ChatBubble[]>([])
+const chatInput = ref('')
+const selectedEmotion = ref('')
+const moodNote = ref('')
+
+const aiTags = ['计划安排', '错题复盘', '高数', '英语', '效率优化']
+const quickPrompts = ['帮我安排今晚学习顺序', '先复盘哪几道错题', '提高英语阅读效率', '把今天计划拆成可执行步骤']
+const emotions = [
+  { label: '超棒', value: 'great', icon: '😄', desc: '状态很好，适合推进主任务' },
+  { label: '还不错', value: 'good', icon: '🙂', desc: '节奏稳定，适合稳步学习' },
+  { label: '一般', value: 'normal', icon: '😐', desc: '状态普通，先完成小任务' },
+  { label: '有点累', value: 'tired', icon: '😮‍💨', desc: '先降低任务难度，避免硬扛' },
+  { label: '有点烦', value: 'frustrated', icon: '😣', desc: '先整理卡点，再继续推进' },
+]
+
+const stats = computed(() => userStore.todayStats)
+
+const overviewCards = computed(() => [
+  { label: '今日学习时长', value: `${stats.value.studyTime}h` },
+  { label: '专注度', value: `${stats.value.focusScore}` },
+  { label: '计划完成', value: `${stats.value.completedTasks}/${stats.value.totalTasks}` },
+  { label: '练习正确率', value: `${stats.value.accuracy}%` },
+])
+
+const currentEmotionLabel = computed(() => {
+  const current = emotions.find(item => item.value === userStore.userInfo.emotionState)
+  return current?.label || '暂未设置'
+})
+
+const radarOption = computed(() => {
+  const radarData = userStore.learningDNA.radarData.length
+    ? userStore.learningDNA.radarData
+    : [
+        { name: '理解能力', value: 0 },
+        { name: '记忆能力', value: 0 },
+        { name: '专注持续', value: 0 },
+        { name: '执行能力', value: 0 },
+        { name: '情绪稳定', value: 0 },
+        { name: '逻辑思维', value: 0 },
+      ]
+
+  return {
+    radar: {
+      indicator: radarData.map(item => ({ name: item.name, max: 100 })),
+      radius: '62%',
+      axisName: { color: '#9ca3af', fontSize: 11 },
+      splitArea: {
+        areaStyle: {
+          color: ['rgba(99,102,241,0.04)', 'rgba(99,102,241,0.10)'],
+        },
+      },
+      axisLine: { lineStyle: { color: 'rgba(99,102,241,0.25)' } },
+      splitLine: { lineStyle: { color: 'rgba(99,102,241,0.16)' } },
+    },
+    series: [
+      {
+        type: 'radar',
+        data: [
+          {
+            value: radarData.map(item => item.value),
+            areaStyle: { color: 'rgba(99,102,241,0.28)' },
+            lineStyle: { color: '#818cf8', width: 2 },
+            itemStyle: { color: '#818cf8' },
+          },
+        ],
+      },
+    ],
+  }
+})
+
+const studyTrendOption = computed(() => ({
+  grid: { top: 20, right: 16, bottom: 24, left: 40 },
+  tooltip: { trigger: 'axis' },
+  xAxis: {
+    type: 'category',
+    data: studyTrend.value.length ? studyTrend.value.map(item => item.date.slice(5)) : ['暂无数据'],
+    axisLine: { lineStyle: { color: '#334155' } },
+    axisLabel: { color: '#6b7280' },
+  },
+  yAxis: {
+    type: 'value',
+    axisLine: { show: false },
+    splitLine: { lineStyle: { color: '#1f2937' } },
+    axisLabel: { color: '#6b7280' },
+  },
+  series: [
+    {
+      type: 'bar',
+      data: studyTrend.value.length ? studyTrend.value.map(item => Math.round((item.duration / 60) * 10) / 10) : [0],
+      barWidth: '52%',
+      itemStyle: {
+        borderRadius: [10, 10, 0, 0],
+        color: {
+          type: 'linear',
+          x: 0,
+          y: 0,
+          x2: 0,
+          y2: 1,
+          colorStops: [
+            { offset: 0, color: '#8b5cf6' },
+            { offset: 1, color: '#3b82f6' },
+          ],
+        },
+      },
+    },
+  ],
+}))
 
 onMounted(async () => {
   try {
-    await Promise.all([userStore.loadUser(), userStore.loadDNA()])
-    const apiStats = await studyApi.getStats()
-    if (apiStats) {
-      userStore.todayStats = {
-        studyTime: Number(apiStats.studyTime) || userStore.todayStats.studyTime,
-        studyTimeChange: Number(apiStats.studyTimeChange) || 0,
-        focusScore: Number(apiStats.focusScore) || 0,
-        focusScoreChange: Number(apiStats.focusScoreChange) || 0,
-        completedTasks: Number(apiStats.completedTasks) || 0,
-        totalTasks: Number(apiStats.totalTasks) || 0,
-        tasksChange: Number(apiStats.tasksChange) || 0,
-        accuracy: Number(apiStats.accuracy) || 0,
-        accuracyChange: Number(apiStats.accuracyChange) || 0,
-      }
-    }
-  } catch {
-    // 后端不可用，保持初始值
+    await Promise.all([userStore.loadUser(), userStore.loadDNA(), loadDashboard()])
+    selectedEmotion.value = userStore.userInfo.emotionState || ''
+    chatMessages.value = buildStarterMessages()
   } finally {
     loading.value = false
   }
 })
 
-const stats = computed(() => userStore.todayStats)
+const loadDashboard = async () => {
+  const userId = getUserId()
+  const [studyStats, studyRecords, mistakeList, mistakeStats] = await Promise.all([
+    studyApi.getStats(userId),
+    studyApi.getRecords(userId, 1, 200),
+    mistakeApi.getList(userId, { pageNum: 1, pageSize: 50 }),
+    mistakeApi.getStats(userId),
+  ])
 
-const radarOption = computed(() => ({
-  radar: {
-    indicator: userStore.learningDNA.radarData.map(item => ({ name: item.name, max: 100 })),
-    radius: '65%',
-    axisName: {
-      color: '#9ca3af',
-      fontSize: 10,
-    },
-    splitArea: {
-      areaStyle: {
-        color: ['rgba(99, 102, 241, 0.05)', 'rgba(99, 102, 241, 0.1)'],
-      },
-    },
-    axisLine: {
-      lineStyle: { color: 'rgba(99, 102, 241, 0.3)' },
-    },
-    splitLine: {
-      lineStyle: { color: 'rgba(99, 102, 241, 0.2)' },
-    },
-  },
-  series: [{
-    type: 'radar',
-    data: [{
-      value: userStore.learningDNA.radarData.map(item => item.value),
-      areaStyle: {
-        color: 'rgba(99, 102, 241, 0.3)',
-      },
-      lineStyle: {
-        color: '#6366f1',
-        width: 2,
-      },
-      itemStyle: {
-        color: '#6366f1',
-      },
-    }],
-  }],
-}))
+  Object.assign(userStore.todayStats, {
+    studyTime: Number(studyStats.studyTime) || 0,
+    studyTimeChange: Number(studyStats.studyTimeChange) || 0,
+    focusScore: Number(studyStats.focusScore) || 0,
+    focusScoreChange: Number(studyStats.focusScoreChange) || 0,
+    completedTasks: Number(studyStats.completedTasks) || 0,
+    totalTasks: Number(studyStats.totalTasks) || 0,
+    tasksChange: Number(studyStats.tasksChange) || 0,
+    accuracy: Number(studyStats.accuracy) || 0,
+    accuracyChange: Number(studyStats.accuracyChange) || 0,
+  })
 
-const focusChartOption = {
-  grid: { top: 10, right: 10, bottom: 20, left: 30 },
-  xAxis: {
-    type: 'category',
-    data: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00', '24:00'],
-    axisLine: { lineStyle: { color: '#374151' } },
-    axisLabel: { color: '#6b7280', fontSize: 10 },
-  },
-  yAxis: {
-    type: 'value',
-    max: 100,
-    axisLine: { show: false },
-    splitLine: { lineStyle: { color: '#1f2937' } },
-    axisLabel: { color: '#6b7280', fontSize: 10 },
-  },
-  series: [{
-    data: [20, 15, 45, 60, 55, 85, 40],
-    type: 'line',
-    smooth: true,
-    symbol: 'none',
-    lineStyle: {
-      color: '#6366f1',
-      width: 3,
-    },
-    areaStyle: {
-      color: {
-        type: 'linear',
-        x: 0, y: 0, x2: 0, y2: 1,
-        colorStops: [
-          { offset: 0, color: 'rgba(99, 102, 241, 0.4)' },
-          { offset: 1, color: 'rgba(99, 102, 241, 0)' },
-        ],
-      },
-    },
-    markPoint: {
-      data: [{ type: 'max', name: '最高', itemStyle: { color: '#a855f7' } }],
-      label: { color: '#fff', fontSize: 10 },
-    },
-  }],
+  studyTrend.value = Array.isArray(studyStats.weekTrend)
+    ? studyStats.weekTrend.map((item: any) => ({
+        date: String(item.date || ''),
+        duration: Number(item.duration) || 0,
+      }))
+    : []
+
+  const localToday = getLocalDateString()
+  todayTasks.value = Array.isArray(studyRecords.list)
+    ? studyRecords.list
+        .filter((item: any) => String(item.studyDate || '').slice(0, 10) === localToday)
+        .map((item: any) => mapStudyRecordToTask(item))
+        .slice(0, 6)
+    : []
+
+  pendingMistakeCount.value = Number(mistakeStats.pending) || 0
+  dashboardMistakes.value = Array.isArray(mistakeList.list)
+    ? mistakeList.list
+        .filter((item: any) => item.status === 'pending' || item.status === 'reviewing')
+        .slice(0, 5)
+        .map((item: any) => ({
+          id: Number(item.id) || Date.now(),
+          title: item.title || '未命名错题',
+          subject: item.subject || '未分类',
+          mistakeType: item.mistakeType || '未分类',
+          errorCount: Number(item.errorCount) || 1,
+          statusLabel: item.status === 'reviewing' ? '复习中' : '待复习',
+        }))
+    : []
 }
 
-const tasks = ref([
-  { id: 1, name: '高数：定积分应用', completed: true, subject: '高数', duration: 60 },
-  { id: 2, name: '英语：阅读理解训练', completed: true, subject: '英语', duration: 40 },
-  { id: 3, name: '线代：矩阵运算', completed: false, subject: '线代', duration: 45 },
-  { id: 4, name: '专业课：信号与系统', completed: true, subject: '专业课', duration: 60 },
-])
+const sendMessage = async () => {
+  const content = chatInput.value.trim()
+  if (!content || sending.value) return
 
-const completedTasks = computed(() => tasks.value.filter(t => t.completed).length)
-const totalTasks = computed(() => tasks.value.length)
-const taskProgress = computed(() => Math.round((completedTasks.value / totalTasks.value) * 100))
-
-const getSubjectClass = (subject: string) => {
-  const map: Record<string, string> = {
-    '高数': 'bg-emerald-500/20 text-emerald-400',
-    '英语': 'bg-blue-500/20 text-blue-400',
-    '线代': 'bg-amber-500/20 text-amber-400',
-    '专业课': 'bg-purple-500/20 text-purple-400',
-  }
-  return map[subject] || 'bg-gray-500/20 text-gray-400'
-}
-
-const mistakes = ref([
-  { title: '定积分求面积问题', subject: '高数', count: 2, tag: '概念理解错误', tagClass: 'bg-rose-500/20 text-rose-400', borderColor: 'border-rose-500' },
-  { title: '矩阵乘法计算', subject: '线代', count: 1, tag: '计算错误', tagClass: 'bg-amber-500/20 text-amber-400', borderColor: 'border-amber-500' },
-  { title: '英语阅读理解题', subject: '英语', count: 1, tag: '细节理解错误', tagClass: 'bg-blue-500/20 text-blue-400', borderColor: 'border-blue-500' },
-])
-
-const studyDataOption = {
-  grid: { top: 10, right: 10, bottom: 20, left: 30 },
-  xAxis: {
-    type: 'category',
-    data: ['周一', '周二', '周三', '周四', '周五', '周六', '今天'],
-    axisLine: { lineStyle: { color: '#374151' } },
-    axisLabel: { color: '#6b7280', fontSize: 10 },
-  },
-  yAxis: {
-    type: 'value',
-    axisLine: { show: false },
-    splitLine: { lineStyle: { color: '#1f2937' } },
-    axisLabel: { color: '#6b7280', fontSize: 10 },
-  },
-  series: [{
-    data: [4, 5, 4.5, 6, 5.5, 4, 4.2],
-    type: 'bar',
-    barWidth: '60%',
-    itemStyle: {
-      borderRadius: [4, 4, 0, 0],
-      color: {
-        type: 'linear',
-        x: 0, y: 0, x2: 0, y2: 1,
-        colorStops: [
-          { offset: 0, color: '#6366f1' },
-          { offset: 1, color: '#a855f7' },
-        ],
-      },
-    },
-  }],
-}
-
-const aiTags = ref(['全部', '高数', '线代', '英语', '专业课', '其他'])
-
-const chatMessages = ref([
-  { isUser: true, content: '这个定积分题我还是不太理解，可以再讲一下吗？', time: '20:30' },
-  { isUser: false, content: '当然可以！这道题的关键在于将图形分割为两个部分分别求面积，然后相加。我们一步一步来分析...', time: '20:31' },
-])
-
-const chatInput = ref('')
-
-const sendMessage = () => {
-  if (!chatInput.value.trim()) return
   chatMessages.value.push({
     isUser: true,
-    content: chatInput.value,
-    time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+    content,
+    time: getCurrentTimeLabel(),
   })
   chatInput.value = ''
-  setTimeout(() => {
+  sending.value = true
+
+  try {
+    const result = await aiApi.chat({
+      message: content,
+      userDNA: userStore.learningDNA.type || userStore.userInfo.learningType,
+      emotion: userStore.userInfo.emotionState,
+      context: '',
+      source: 'dashboard',
+      forcedAgent: 'auto',
+    })
+
     chatMessages.value.push({
       isUser: false,
-      content: '好的，我来为你详细解答这个问题。首先我们需要理解定积分的几何意义...',
-      time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+      content: result.response || 'AI 暂时没有返回内容，请稍后再试。',
+      time: getCurrentTimeLabel(),
     })
-  }, 1000)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'AI 服务异常，请稍后重试'
+    ElMessage.error(message)
+    chatMessages.value.push({
+      isUser: false,
+      content: 'AI 服务暂时不可用，稍后再试；你也可以先进入完整 AI 助手页继续咨询。',
+      time: getCurrentTimeLabel(),
+    })
+  } finally {
+    sending.value = false
+  }
 }
 
-const emotions = ref([
-  { label: '超棒', value: 'great', icon: '😄' },
-  { label: '还不错', value: 'good', icon: '🙂' },
-  { label: '一般', value: 'normal', icon: '😐' },
-  { label: '有点累', value: 'tired', icon: '😔' },
-  { label: '很烦躁', value: 'frustrated', icon: '😫' },
-])
-
-const selectedEmotion = ref('')
-const moodNote = ref('')
-
-const selectEmotion = (emotion: any) => {
-  selectedEmotion.value = emotion.value
+const fillQuickPrompt = (prompt: string) => {
+  chatInput.value = prompt
 }
 
-const saveMood = () => {
+const saveMood = async () => {
   if (!selectedEmotion.value) {
-    ElMessage.warning('请先选择一个心情')
+    ElMessage.warning('请先选择当前情绪')
     return
   }
-  ElMessage.success('心情已保存，AI会更加了解你的学习状态')
-  selectedEmotion.value = ''
-  moodNote.value = ''
+
+  const emotion = emotions.find(item => item.value === selectedEmotion.value)
+  savingEmotion.value = true
+
+  try {
+    await emotionApi.addRecord({
+      emotionType: selectedEmotion.value,
+      emotionLabel: emotion?.label || '一般',
+      content: moodNote.value.trim() || '首页情绪打卡',
+      relatedActivity: '首页情绪中心',
+    })
+
+    await userStore.loadUser()
+    moodNote.value = ''
+    ElMessage.success('情绪已保存')
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '情绪保存失败，请稍后重试'
+    ElMessage.error(message)
+  } finally {
+    savingEmotion.value = false
+  }
+}
+
+const buildStarterMessages = (): ChatBubble[] => {
+  const firstTask = todayTasks.value[0]
+  const taskTip = firstTask
+    ? `我已经看到你今天排了 ${stats.value.totalTasks} 个计划，建议先从「${firstTask.name}」开场。`
+    : '你今天还没有开始学习计划，我可以先帮你拆一个容易启动的小任务。'
+
+  return [
+    {
+      isUser: false,
+      content: '晚上好，我是你的首页版 AI 学习助手。这里会先陪你看计划、盯错题、稳节奏，再把深入咨询交给完整 AI 页面。',
+      time: '19:30',
+    },
+    {
+      isUser: true,
+      content: '今晚我想先把计划和错题复盘顺序理清楚。',
+      time: '19:31',
+    },
+    {
+      isUser: false,
+      content: `${taskTip}\n另外你现在还有 ${pendingMistakeCount.value} 道待复习错题，建议先做 1 个主任务，再集中复盘 2 道最常错的题。`,
+      time: '19:31',
+    },
+  ]
+}
+
+const mapStudyRecordToTask = (record: any): StudyTask => {
+  const parsed = parseStudyContent(record.content)
+  return {
+    id: Number(record.id) || Date.now(),
+    name: parsed.name,
+    goal: parsed.goal,
+    subject: record.subject || '未分类',
+    duration: Number(record.duration) || 0,
+    completed: Boolean(record.endTime),
+  }
+}
+
+const parseStudyContent = (content?: string) => {
+  if (!content) {
+    return { name: '学习任务', goal: '' }
+  }
+
+  try {
+    const parsed = JSON.parse(content)
+    return {
+      name: parsed.name || parsed.goal || '学习任务',
+      goal: parsed.goal || '',
+    }
+  } catch {
+    return { name: content, goal: '' }
+  }
+}
+
+const getCurrentTimeLabel = () => {
+  return new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+}
+
+const getUserId = () => {
+  try {
+    const stored = localStorage.getItem('cognia-user')
+    const parsed = stored ? JSON.parse(stored) : null
+    return Number(parsed?.id) || 1
+  } catch {
+    return 1
+  }
+}
+
+const getLocalDateString = (date = new Date()) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 </script>

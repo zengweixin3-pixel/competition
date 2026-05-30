@@ -1,380 +1,288 @@
 <template>
   <div class="space-y-6" v-loading="loading">
-    <!-- 页面标题 -->
-    <div class="flex items-center justify-between">
-      <div>
-        <h2 class="text-2xl font-bold text-text-primary">错题分析中心</h2>
-        <p class="text-text-muted mt-1">AI智能分析错因，精准提升薄弱环节</p>
-      </div>
-      <div class="flex gap-3">
-        <el-button type="primary" size="large" @click="showUploadDialog = true">
-          <el-icon class="mr-2"><Upload /></el-icon>上传错题
-        </el-button>
-        <el-button size="large" @click="startReview">
-          <el-icon class="mr-2"><VideoPlay /></el-icon>开始复习
-        </el-button>
-      </div>
+    <div class="flex items-center justify-end gap-3">
+      <el-button size="large" @click="reload">刷新数据</el-button>
+      <el-button size="large" type="primary" @click="showCreateDialog = true">新增错题</el-button>
     </div>
 
-    <!-- 统计卡片 -->
-    <div class="grid grid-cols-4 gap-6">
-      <div class="card-gradient rounded-2xl p-6">
-        <div class="flex items-center justify-between">
-          <div>
-            <div class="text-3xl font-bold text-text-primary">{{ stats.total }}</div>
-            <div class="text-sm text-text-muted mt-1">总错题数</div>
-          </div>
-          <div class="w-14 h-14 rounded-xl bg-primary/20 flex items-center justify-center">
-            <el-icon class="text-primary text-2xl"><Document /></el-icon>
-          </div>
-        </div>
-        <div class="mt-4 flex items-center gap-2 text-sm">
-          <span class="text-emerald-400">↓ 12%</span>
-          <span class="text-text-muted">较上月</span>
-        </div>
+    <section class="grid grid-cols-2 gap-6 xl:grid-cols-4">
+      <div class="card-gradient rounded-[28px] p-6 text-center">
+        <p class="text-sm text-text-muted">总错题数</p>
+        <p class="mt-3 text-3xl font-bold text-text-primary">{{ stats.total }}</p>
       </div>
-      <div class="card-gradient rounded-2xl p-6">
-        <div class="flex items-center justify-between">
-          <div>
-            <div class="text-3xl font-bold text-text-primary">{{ stats.pending }}</div>
-            <div class="text-sm text-text-muted mt-1">待复习</div>
-          </div>
-          <div class="w-14 h-14 rounded-xl bg-amber-500/20 flex items-center justify-center">
-            <el-icon class="text-amber-400 text-2xl"><Timer /></el-icon>
-          </div>
-        </div>
-        <div class="mt-4 flex items-center gap-2 text-sm">
-          <span class="text-rose-400">↑ 5%</span>
-          <span class="text-text-muted">较上周</span>
-        </div>
+      <div class="card-gradient rounded-[28px] p-6 text-center">
+        <p class="text-sm text-text-muted">待复习</p>
+        <p class="mt-3 text-3xl font-bold text-text-primary">{{ stats.pending }}</p>
       </div>
-      <div class="card-gradient rounded-2xl p-6">
-        <div class="flex items-center justify-between">
-          <div>
-            <div class="text-3xl font-bold text-text-primary">{{ stats.mastered }}</div>
-            <div class="text-sm text-text-muted mt-1">已掌握</div>
-          </div>
-          <div class="w-14 h-14 rounded-xl bg-emerald-500/20 flex items-center justify-center">
-            <el-icon class="text-emerald-400 text-2xl"><CircleCheck /></el-icon>
-          </div>
-        </div>
-        <div class="mt-4 flex items-center gap-2 text-sm">
-          <span class="text-emerald-400">↑ 23%</span>
-          <span class="text-text-muted">较上月</span>
-        </div>
+      <div class="card-gradient rounded-[28px] p-6 text-center">
+        <p class="text-sm text-text-muted">复习中</p>
+        <p class="mt-3 text-3xl font-bold text-text-primary">{{ stats.reviewing }}</p>
       </div>
-      <div class="card-gradient rounded-2xl p-6">
-        <div class="flex items-center justify-between">
-          <div>
-            <div class="text-3xl font-bold text-text-primary">{{ stats.accuracy }}%</div>
-            <div class="text-sm text-text-muted mt-1">复习正确率</div>
-          </div>
-          <div class="w-14 h-14 rounded-xl bg-accent-purple/20 flex items-center justify-center">
-            <el-icon class="text-accent-purple text-2xl"><TrendCharts /></el-icon>
-          </div>
-        </div>
-        <div class="mt-4 flex items-center gap-2 text-sm">
-          <span class="text-emerald-400">↑ 8%</span>
-          <span class="text-text-muted">较上月</span>
-        </div>
+      <div class="card-gradient rounded-[28px] p-6 text-center">
+        <p class="text-sm text-text-muted">已掌握</p>
+        <p class="mt-3 text-3xl font-bold text-text-primary">{{ stats.mastered }}</p>
       </div>
-    </div>
+    </section>
 
-    <!-- 错因分析图表 -->
-    <div class="grid grid-cols-12 gap-6">
-      <div class="col-span-7 card-gradient rounded-2xl p-6">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="font-bold text-text-primary">错因分布分析</h3>
-          <el-radio-group v-model="analysisTimeRange" size="small">
-            <el-radio-button label="本周">本周</el-radio-button>
-            <el-radio-button label="本月">本月</el-radio-button>
-            <el-radio-button label="全部">全部</el-radio-button>
-          </el-radio-group>
+    <section class="grid grid-cols-1 gap-6 xl:grid-cols-2">
+      <div class="card-gradient rounded-[28px] p-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-lg font-bold text-text-primary">错因分布</h3>
+            <p class="text-sm text-text-muted">快速看清常见失分原因</p>
+          </div>
         </div>
-        <div class="h-64">
-          <v-chart class="w-full h-full" :option="mistakeTypeOption" autoresize />
+        <div class="mt-5 h-72">
+          <v-chart class="h-full w-full" :option="mistakeTypeOption" autoresize />
         </div>
       </div>
-      <div class="col-span-5 card-gradient rounded-2xl p-6">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="font-bold text-text-primary">学科错题分布</h3>
-        </div>
-        <div class="h-64">
-          <v-chart class="w-full h-full" :option="subjectOption" autoresize />
-        </div>
-      </div>
-    </div>
 
-    <!-- 错题列表 -->
-    <div class="card-gradient rounded-2xl p-6">
-      <div class="flex items-center justify-between mb-6">
-        <div class="flex items-center gap-4">
-          <h3 class="font-bold text-text-primary">错题列表</h3>
-          <el-input v-model="searchQuery" placeholder="搜索错题..." style="width: 240px" :prefix-icon="Search" />
+      <div class="card-gradient rounded-[28px] p-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-lg font-bold text-text-primary">学科分布</h3>
+            <p class="text-sm text-text-muted">看看问题更集中在哪些学科</p>
+          </div>
+          <el-tag type="success">改善率 {{ stats.improvement }}%</el-tag>
         </div>
-        <div class="flex items-center gap-3">
-          <el-select v-model="filterSubject" placeholder="学科筛选" style="width: 120px" clearable>
-            <el-option label="全部学科" value="" />
-            <el-option label="高等数学" value="math" />
-            <el-option label="线性代数" value="linear" />
-            <el-option label="英语" value="english" />
-            <el-option label="专业课" value="major" />
+        <div class="mt-5 h-72">
+          <v-chart class="h-full w-full" :option="subjectOption" autoresize />
+        </div>
+      </div>
+    </section>
+
+    <section class="card-gradient rounded-[28px] p-6">
+      <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div class="grid flex-1 grid-cols-1 gap-3 md:grid-cols-[1.4fr_0.8fr_0.8fr]">
+          <el-input v-model="searchQuery" placeholder="搜索标题、内容或学科" clearable />
+          <el-select v-model="filterSubject" clearable placeholder="筛选学科">
+            <el-option label="高等数学" value="高等数学" />
+            <el-option label="线性代数" value="线性代数" />
+            <el-option label="英语" value="英语" />
+            <el-option label="专业课" value="专业课" />
           </el-select>
-          <el-select v-model="filterType" placeholder="错因筛选" style="width: 120px" clearable>
-            <el-option label="全部错因" value="" />
-            <el-option label="概念混淆" value="concept" />
-            <el-option label="计算错误" value="calculation" />
-            <el-option label="粗心大意" value="careless" />
-            <el-option label="公式遗忘" value="formula" />
-          </el-select>
-          <el-select v-model="sortBy" placeholder="排序方式" style="width: 120px">
-            <el-option label="最近添加" value="recent" />
-            <el-option label="错误次数" value="count" />
-            <el-option label="难度等级" value="difficulty" />
+          <el-select v-model="filterStatus" clearable placeholder="筛选状态">
+            <el-option label="待复习" value="pending" />
+            <el-option label="复习中" value="reviewing" />
+            <el-option label="已掌握" value="mastered" />
           </el-select>
         </div>
       </div>
 
-      <div class="space-y-4">
+      <div class="mt-5 space-y-4">
         <div
           v-for="mistake in filteredMistakes"
           :key="mistake.id"
-          class="bg-dark-bg/50 rounded-xl p-6 border-l-4 cursor-pointer transition-all hover:bg-dark-border/50"
-          :class="mistake.borderColor"
-          @click="viewMistakeDetail(mistake)"
+          class="rounded-[28px] border border-white/8 bg-dark-bg/40 p-5"
         >
-          <div class="flex items-start gap-4">
-            <div class="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0" :class="mistake.iconBg">
-              <el-icon :class="mistake.iconColor" class="text-xl"><component :is="mistake.icon" /></el-icon>
-            </div>
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-3 mb-2">
-                <h4 class="font-bold text-text-primary">{{ mistake.title }}</h4>
-                <el-tag size="small" :type="mistake.tagType">{{ mistake.subject }}</el-tag>
-                <el-tag size="small" effect="dark" :class="mistake.typeTagClass">{{ mistake.mistakeType }}</el-tag>
+          <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div class="min-w-0 flex-1">
+              <div class="flex flex-wrap items-center gap-2">
+                <h4 class="text-base font-bold text-text-primary">{{ mistake.title }}</h4>
+                <el-tag size="small">{{ mistake.subject }}</el-tag>
+                <el-tag size="small" type="warning">{{ mistake.mistakeType }}</el-tag>
+                <el-tag size="small" :type="statusTagType(mistake.status)">
+                  {{ statusLabel(mistake.status) }}
+                </el-tag>
               </div>
-              <p class="text-sm text-text-secondary mb-3 line-clamp-2">{{ mistake.content }}</p>
-              <div class="flex items-center gap-6 text-sm">
-                <span class="text-text-muted">错误 {{ mistake.errorCount }} 次</span>
-                <span class="text-text-muted">难度：{{ mistake.difficulty }}</span>
-                <span class="text-text-muted">添加于 {{ mistake.addTime }}</span>
+
+              <p class="mt-3 text-sm leading-6 text-text-secondary">{{ mistake.content }}</p>
+
+              <div class="mt-3 flex flex-wrap gap-4 text-xs text-text-muted">
+                <span>错误 {{ mistake.errorCount }} 次</span>
+                <span>难度 {{ mistake.difficulty || '未标注' }}</span>
+                <span>创建时间 {{ formatDate(mistake.createTime) }}</span>
+              </div>
+
+              <div v-if="mistake.aiAnalysis && expandedAnalysisIds.includes(mistake.id)" class="mt-4 rounded-3xl border border-primary/15 bg-primary/10 p-4">
+                <div class="flex items-center justify-between gap-3">
+                  <p class="text-xs uppercase tracking-[0.16em] text-primary">
+                    {{ isAnalysisPendingText(mistake.aiAnalysis) ? 'AI 正在分析' : '最新 AI 分析' }}
+                  </p>
+                  <el-button link type="primary" @click="toggleAnalysis(mistake.id)">收起</el-button>
+                </div>
+                <pre class="mt-3 whitespace-pre-wrap text-sm leading-7 text-text-primary">{{ mistake.aiAnalysis }}</pre>
               </div>
             </div>
-            <div class="flex items-center gap-2">
-              <el-button type="primary" size="small" plain @click.stop="reviewMistake(mistake)">复习</el-button>
-              <el-button size="small" @click.stop="viewAnalysis(mistake)">AI分析</el-button>
+
+            <div class="flex shrink-0 gap-2">
+              <el-button :loading="isAnalysisLoading(mistake.id)" @click="analyzeMistake(mistake)">
+                {{ isAnalysisPending(mistake.id) ? '分析中...' : 'AI分析' }}
+              </el-button>
+              <el-button
+                v-if="mistake.aiAnalysis"
+                plain
+                @click="toggleAnalysis(mistake.id)"
+              >
+                {{ expandedAnalysisIds.includes(mistake.id) ? '收起分析' : '展开分析' }}
+              </el-button>
+              <el-button type="primary" plain @click="openAnalysis(mistake)">查看详情</el-button>
             </div>
           </div>
         </div>
-      </div>
 
-      <div class="mt-6 flex justify-center">
-        <el-pagination
-          v-model:current-page="currentPage"
-          v-model:page-size="pageSize"
-          :total="totalMistakes"
-          :page-sizes="[10, 20, 50]"
-          layout="total, sizes, prev, pager, next"
-        />
+        <el-empty v-if="filteredMistakes.length === 0" description="暂无错题数据" />
       </div>
-    </div>
+    </section>
+
+    <el-dialog v-model="showCreateDialog" title="新增错题" width="560px" destroy-on-close>
+      <div class="space-y-4">
+        <el-input v-model="form.title" placeholder="错题标题" />
+        <el-input v-model="form.content" type="textarea" :rows="5" placeholder="题目内容、错误步骤或错因描述" />
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <el-select v-model="form.subject" placeholder="选择学科">
+            <el-option label="高等数学" value="高等数学" />
+            <el-option label="线性代数" value="线性代数" />
+            <el-option label="英语" value="英语" />
+            <el-option label="专业课" value="专业课" />
+          </el-select>
+          <el-select v-model="form.mistakeType" placeholder="错误类型">
+            <el-option label="概念混淆" value="概念混淆" />
+            <el-option label="计算错误" value="计算错误" />
+            <el-option label="理解偏差" value="理解偏差" />
+            <el-option label="审题偏差" value="审题偏差" />
+            <el-option label="方法不熟" value="方法不熟" />
+          </el-select>
+          <el-input-number v-model="form.errorCount" :min="1" class="w-full" />
+          <el-select v-model="form.difficulty" placeholder="难度">
+            <el-option label="简单" value="简单" />
+            <el-option label="中等" value="中等" />
+            <el-option label="困难" value="困难" />
+          </el-select>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="showCreateDialog = false">取消</el-button>
+        <el-button type="primary" :loading="saving" @click="createMistake">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="showAnalysisDialog" title="错题详情" width="760px" destroy-on-close>
+      <div v-if="selectedMistake" class="space-y-5">
+        <div class="rounded-3xl bg-dark-bg/50 p-4">
+          <h4 class="text-base font-bold text-text-primary">{{ selectedMistake.title }}</h4>
+          <p class="mt-3 text-sm leading-6 text-text-secondary">{{ selectedMistake.content }}</p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div class="rounded-3xl bg-dark-bg/50 p-4">
+            <p class="text-xs text-text-muted">学科</p>
+            <p class="mt-2 text-sm text-text-primary">{{ selectedMistake.subject }}</p>
+          </div>
+          <div class="rounded-3xl bg-dark-bg/50 p-4">
+            <p class="text-xs text-text-muted">状态</p>
+            <p class="mt-2 text-sm text-text-primary">{{ statusLabel(selectedMistake.status) }}</p>
+          </div>
+        </div>
+
+        <div class="rounded-3xl border border-primary/20 bg-primary/10 p-5">
+          <p class="text-xs uppercase tracking-[0.16em] text-primary">AI 分析结果</p>
+          <pre class="mt-3 whitespace-pre-wrap text-sm leading-7 text-text-primary">{{ selectedMistake.aiAnalysis || '还没有生成 AI 分析。' }}</pre>
+        </div>
+      </div>
+    </el-dialog>
   </div>
-
-  <!-- 上传对话框 -->
-  <el-dialog v-model="showUploadDialog" title="上传错题" width="600px" destroy-on-close>
-    <div class="space-y-6">
-      <el-upload
-        drag
-        action="#"
-        :auto-upload="false"
-        class="w-full"
-      >
-        <el-icon class="text-4xl text-primary mb-4"><Upload /></el-icon>
-        <div class="text-text-primary mb-2">拖拽文件到此处，或<em class="text-primary">点击上传</em></div>
-        <div class="text-xs text-text-muted">支持图片、PDF、Word格式，单个文件不超过10MB</div>
-      </el-upload>
-      <div>
-        <div class="text-sm text-text-primary mb-2">或手动输入</div>
-        <el-input v-model="uploadTitle" placeholder="错题标题（可选）" class="mb-3" />
-        <el-input v-model="uploadContent" type="textarea" :rows="4" placeholder="粘贴题目内容..." />
-      </div>
-      <div class="flex gap-4">
-        <el-select v-model="uploadSubject" placeholder="选择学科" class="flex-1">
-          <el-option label="高等数学" value="math" />
-          <el-option label="线性代数" value="linear" />
-          <el-option label="英语" value="english" />
-          <el-option label="专业课" value="major" />
-        </el-select>
-        <el-select v-model="uploadDifficulty" placeholder="难度等级" class="flex-1">
-          <el-option label="简单" value="easy" />
-          <el-option label="中等" value="medium" />
-          <el-option label="困难" value="hard" />
-        </el-select>
-      </div>
-    </div>
-    <template #footer>
-      <el-button @click="showUploadDialog = false">取消</el-button>
-      <el-button type="primary" @click="uploadMistake">上传并分析</el-button>
-    </template>
-  </el-dialog>
-
-  <!-- AI分析详情对话框 -->
-  <el-dialog v-model="showAnalysisDialog" title="AI错因分析" width="700px" destroy-on-close>
-    <div v-if="selectedMistake" class="space-y-6">
-      <div class="bg-dark-bg/50 rounded-xl p-4">
-        <div class="text-sm text-gray-600 mb-2">题目</div>
-        <div class="text-gray-900 font-medium">{{ selectedMistake.title }}</div>
-      </div>
-
-      <div class="grid grid-cols-2 gap-4">
-        <div class="bg-rose-500/10 rounded-xl p-4 border border-rose-500/30">
-          <div class="flex items-center gap-2 mb-2">
-            <el-icon class="text-rose-400"><CircleClose /></el-icon>
-            <span class="font-medium text-rose-400">错误原因</span>
-          </div>
-          <div class="text-gray-800">{{ selectedMistake.analysis?.reason }}</div>
-        </div>
-        <div class="bg-amber-500/10 rounded-xl p-4 border border-amber-500/30">
-          <div class="flex items-center gap-2 mb-2">
-            <el-icon class="text-amber-400"><Warning /></el-icon>
-            <span class="font-medium text-amber-400">根本问题</span>
-          </div>
-          <div class="text-gray-800">{{ selectedMistake.analysis?.rootCause }}</div>
-        </div>
-      </div>
-
-      <div class="bg-emerald-500/10 rounded-xl p-4 border border-emerald-500/30">
-        <div class="flex items-center gap-2 mb-3">
-          <el-icon class="text-emerald-400"><CircleCheck /></el-icon>
-          <span class="font-medium text-emerald-400">AI建议</span>
-        </div>
-        <ul class="space-y-2">
-          <li v-for="(suggestion, idx) in selectedMistake.analysis?.suggestions" :key="idx" class="flex items-start gap-2 text-gray-800">
-            <span class="text-emerald-400 mt-1">•</span>
-            <span>{{ suggestion }}</span>
-          </li>
-        </ul>
-      </div>
-
-      <div class="bg-primary/10 rounded-xl p-4 border border-primary/30">
-        <div class="flex items-center gap-2 mb-3">
-          <el-icon class="text-primary"><Document /></el-icon>
-          <span class="font-medium text-primary">推荐学习资源</span>
-        </div>
-        <div class="space-y-2">
-          <div v-for="(resource, idx) in selectedMistake.analysis?.resources" :key="idx" class="flex items-center justify-between p-3 bg-dark-bg/50 rounded-lg">
-            <div class="flex items-center gap-3">
-              <el-icon class="text-primary"><VideoPlay /></el-icon>
-              <span class="text-text-primary">{{ resource.title }}</span>
-            </div>
-            <el-button type="primary" size="small" plain>查看</el-button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </el-dialog>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { use } from 'echarts/core'
+import { BarChart, PieChart } from 'echarts/charts'
+import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
-import { PieChart, BarChart } from 'echarts/charts'
-import { GridComponent, TooltipComponent, LegendComponent } from 'echarts/components'
 import VChart from 'vue-echarts'
-import { mistakeApi } from '@/api'
-import {
-  Upload,
-  VideoPlay,
-  Document,
-  Timer,
-  CircleCheck,
-  TrendCharts,
-  Search,
-  CircleClose,
-  Warning,
-} from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import { mistakeApi } from '@/api'
+import { useUserStore } from '@/stores/user'
 
 use([CanvasRenderer, PieChart, BarChart, GridComponent, TooltipComponent, LegendComponent])
 
-const loading = ref(true)
-
-const stats = ref({
-  total: 128,
-  pending: 12,
-  mastered: 89,
-  accuracy: 76,
-})
-
-const analysisTimeRange = ref('本月')
-const searchQuery = ref('')
-const filterSubject = ref('')
-const filterType = ref('')
-const sortBy = ref('recent')
-const currentPage = ref(1)
-const pageSize = ref(10)
-const totalMistakes = ref(128)
-
-const showUploadDialog = ref(false)
-const showAnalysisDialog = ref(false)
-const selectedMistake = ref<any>(null)
-const uploadSubject = ref('')
-const uploadDifficulty = ref('')
-const uploadContent = ref('')
-const uploadTitle = ref('')
-
-const mistakeTypeOption = {
-  tooltip: {
-    trigger: 'item',
-    backgroundColor: 'rgba(17, 24, 39, 0.9)',
-    borderColor: '#374151',
-    textStyle: { color: '#f9fafb' },
-  },
-  legend: {
-    orient: 'vertical',
-    right: 10,
-    top: 'center',
-    textStyle: { color: '#9ca3af' },
-  },
-  series: [{
-    type: 'pie',
-    radius: ['40%', '70%'],
-    center: ['35%', '50%'],
-    avoidLabelOverlap: false,
-    itemStyle: {
-      borderRadius: 8,
-      borderColor: '#0a0e1a',
-      borderWidth: 2,
-    },
-    label: { show: false },
-    emphasis: {
-      label: {
-        show: true,
-        fontSize: 14,
-        fontWeight: 'bold',
-        color: '#f9fafb',
-      },
-    },
-    data: [
-      { value: 35, name: '概念混淆', itemStyle: { color: '#6366f1' } },
-      { value: 28, name: '计算错误', itemStyle: { color: '#a855f7' } },
-      { value: 22, name: '粗心大意', itemStyle: { color: '#f59e0b' } },
-      { value: 18, name: '公式遗忘', itemStyle: { color: '#10b981' } },
-      { value: 15, name: '理解偏差', itemStyle: { color: '#06b6d4' } },
-      { value: 10, name: '其他', itemStyle: { color: '#6b7280' } },
-    ],
-  }],
+type MistakeItem = {
+  id: number
+  title: string
+  content: string
+  subject: string
+  mistakeType: string
+  errorCount: number
+  difficulty?: string
+  status: string
+  aiAnalysis?: string
+  createTime?: string
 }
 
-const subjectOption = {
-  grid: { top: 20, right: 20, bottom: 30, left: 80 },
-  tooltip: {
-    trigger: 'axis',
-    backgroundColor: 'rgba(17, 24, 39, 0.9)',
-    borderColor: '#374151',
-    textStyle: { color: '#f9fafb' },
-  },
+const ANALYSIS_PENDING_PREFIX = '[AI分析中]'
+const ANALYSIS_PENDING_TEXT = '[AI分析中] 正在生成分析，请稍后查看。'
+const ANALYSIS_FAILURE_PREFIX = '[AI服务异常]'
+const ANALYSIS_POLL_INTERVAL = 2500
+const ANALYSIS_POLL_MAX_COUNT = 24
+
+const userStore = useUserStore()
+const loading = ref(true)
+const saving = ref(false)
+const showCreateDialog = ref(false)
+const showAnalysisDialog = ref(false)
+const analyzingId = ref<number | null>(null)
+const analysisPendingIds = ref<number[]>([])
+const expandedAnalysisIds = ref<number[]>([])
+const searchQuery = ref('')
+const filterSubject = ref('')
+const filterStatus = ref('')
+const selectedMistake = ref<MistakeItem | null>(null)
+const mistakes = ref<MistakeItem[]>([])
+const pollingTimers = new Map<number, number>()
+const stats = ref({
+  total: 0,
+  pending: 0,
+  reviewing: 0,
+  mastered: 0,
+  improvement: 0,
+  typeDistribution: [] as Array<{ mistakeType?: string; count?: number }>,
+  subjectDistribution: [] as Array<{ subject?: string; count?: number }>,
+})
+
+const form = ref({
+  title: '',
+  content: '',
+  subject: '',
+  mistakeType: '概念混淆',
+  errorCount: 1,
+  difficulty: '中等',
+})
+
+const filteredMistakes = computed(() => {
+  const keyword = searchQuery.value.trim().toLowerCase()
+  return mistakes.value.filter((item) => {
+    const matchKeyword = !keyword || [item.title, item.content, item.subject].some(field => field?.toLowerCase().includes(keyword))
+    const matchSubject = !filterSubject.value || item.subject === filterSubject.value
+    const matchStatus = !filterStatus.value || item.status === filterStatus.value
+    return matchKeyword && matchSubject && matchStatus
+  })
+})
+
+const mistakeTypeOption = computed(() => ({
+  tooltip: { trigger: 'item' },
+  legend: { bottom: 0, textStyle: { color: '#9ca3af' } },
+  series: [
+    {
+      type: 'pie',
+      radius: ['42%', '72%'],
+      data: stats.value.typeDistribution.length
+        ? stats.value.typeDistribution.map((item, index) => ({
+            value: Number(item.count) || 0,
+            name: item.mistakeType || '未分类',
+            itemStyle: {
+              color: ['#6366f1', '#8b5cf6', '#f59e0b', '#10b981', '#06b6d4'][index % 5],
+            },
+          }))
+        : [{ value: 0, name: '暂无数据', itemStyle: { color: '#6b7280' } }],
+      label: { color: '#e5e7eb' },
+    },
+  ],
+}))
+
+const subjectOption = computed(() => ({
+  grid: { top: 20, right: 20, bottom: 24, left: 56 },
+  tooltip: { trigger: 'axis' },
   xAxis: {
     type: 'value',
     axisLine: { show: false },
@@ -383,253 +291,295 @@ const subjectOption = {
   },
   yAxis: {
     type: 'category',
-    data: ['专业课', '英语', '线性代数', '高等数学'],
+    data: stats.value.subjectDistribution.length ? stats.value.subjectDistribution.map(item => item.subject || '未分类') : ['暂无数据'],
     axisLine: { lineStyle: { color: '#374151' } },
     axisLabel: { color: '#9ca3af' },
   },
-  series: [{
-    type: 'bar',
-    data: [
-      { value: 25, itemStyle: { color: '#06b6d4', borderRadius: [0, 4, 4, 0] } },
-      { value: 18, itemStyle: { color: '#f59e0b', borderRadius: [0, 4, 4, 0] } },
-      { value: 32, itemStyle: { color: '#a855f7', borderRadius: [0, 4, 4, 0] } },
-      { value: 53, itemStyle: { color: '#6366f1', borderRadius: [0, 4, 4, 0] } },
-    ],
-    barWidth: '60%',
-  }],
-}
-
-const mistakes = ref([
-  {
-    id: 1,
-    title: '定积分求面积问题：计算曲线y=x²与y=x围成的区域面积',
-    content: '在计算定积分时，没有正确找出两个函数的交点，导致积分上下限设置错误...',
-    subject: '高等数学',
-    mistakeType: '概念混淆',
-    errorCount: 2,
-    difficulty: '中等',
-    addTime: '2024-01-15',
-    icon: 'Document',
-    iconBg: 'bg-primary/20',
-    iconColor: 'text-primary',
-    borderColor: 'border-primary',
-    tagType: 'primary',
-    typeTagClass: 'bg-primary/30 border-primary/50',
-    analysis: {
-      reason: '没有理解定积分的几何意义，不清楚如何确定积分上下限',
-      rootCause: '对函数图像的交点求解不熟练，缺乏数形结合的思维',
-      suggestions: [
-        '重新学习定积分的几何意义，理解"面积=积分"的本质',
-        '练习画函数图像，培养数形结合能力',
-        '多做求交点的专项练习',
-        '使用AI学习助手进行针对性训练',
-      ],
-      resources: [
-        { title: '定积分几何意义详解视频', type: 'video' },
-        { title: '函数图像与交点求解专题', type: 'doc' },
-        { title: '定积分求面积练习题集', type: 'exercise' },
-      ],
+  series: [
+    {
+      type: 'bar',
+      data: stats.value.subjectDistribution.length
+        ? stats.value.subjectDistribution.map((item, index) => ({
+            value: Number(item.count) || 0,
+            itemStyle: {
+              color: ['#6366f1', '#10b981', '#f59e0b', '#8b5cf6'][index % 4],
+              borderRadius: [0, 8, 8, 0],
+            },
+          }))
+        : [{ value: 0, itemStyle: { color: '#6b7280' } }],
+      barWidth: '56%',
     },
-  },
-  {
-    id: 2,
-    title: '矩阵乘法计算：求AB的乘积，其中A为3×2矩阵，B为2×4矩阵',
-    content: '在进行矩阵乘法时，行与列的对应元素相乘后相加的计算过程中出现错误...',
-    subject: '线性代数',
-    mistakeType: '计算错误',
-    errorCount: 3,
-    difficulty: '简单',
-    addTime: '2024-01-14',
-    icon: 'Grid',
-    iconBg: 'bg-accent-purple/20',
-    iconColor: 'text-accent-purple',
-    borderColor: 'border-accent-purple',
-    tagType: 'success',
-    typeTagClass: 'bg-accent-purple/30 border-accent-purple/50',
-    analysis: {
-      reason: '矩阵乘法计算过程中粗心，没有仔细核对每个元素的计算',
-      rootCause: '计算习惯不好，缺乏检查步骤',
-      suggestions: [
-        '养成逐步计算并标注的习惯',
-        '计算完成后进行验算',
-        '多做基础计算练习，提高准确率',
-      ],
-      resources: [
-        { title: '矩阵乘法计算技巧', type: 'video' },
-        { title: '线性代数计算题专项训练', type: 'exercise' },
-      ],
-    },
-  },
-  {
-    id: 3,
-    title: '英语阅读理解：关于气候变化的科普文章',
-    content: '在阅读理解题中，对文章主旨的把握出现偏差，导致主旨题选择错误...',
-    subject: '英语',
-    mistakeType: '理解偏差',
-    errorCount: 1,
-    difficulty: '困难',
-    addTime: '2024-01-13',
-    icon: 'Reading',
-    iconBg: 'bg-amber-500/20',
-    iconColor: 'text-amber-400',
-    borderColor: 'border-amber-500',
-    tagType: 'warning',
-    typeTagClass: 'bg-amber-500/30 border-amber-500/50',
-    analysis: {
-      reason: '过度关注细节，忽略了文章的整体结构和主旨',
-      rootCause: '阅读策略不当，没有先把握文章框架再读细节',
-      suggestions: [
-        '先读首尾段把握主旨，再读细节',
-        '练习快速浏览skimming技巧',
-        '多做主旨大意题专项训练',
-      ],
-      resources: [
-        { title: '英语阅读技巧：如何快速把握主旨', type: 'video' },
-        { title: '阅读理解主旨题专项练习', type: 'exercise' },
-      ],
-    },
-  },
-])
-
-const filteredMistakes = computed(() => {
-  let result = [...mistakes.value]
-  if (searchQuery.value.trim()) {
-    const q = searchQuery.value.trim().toLowerCase()
-    result = result.filter(m =>
-      m.title.toLowerCase().includes(q) ||
-      m.content.toLowerCase().includes(q) ||
-      m.subject.toLowerCase().includes(q)
-    )
-  }
-  if (filterSubject.value) {
-    const subjectMap: Record<string, string> = {
-      'math': '高等数学',
-      'linear': '线性代数',
-      'english': '英语',
-      'major': '专业课',
-    }
-    const subjectName = subjectMap[filterSubject.value] || filterSubject.value
-    result = result.filter(m => m.subject === subjectName)
-  }
-  if (filterType.value) {
-    const typeMap: Record<string, string> = {
-      'concept': '概念混淆',
-      'calculation': '计算错误',
-      'careless': '粗心大意',
-      'formula': '公式遗忘',
-    }
-    const typeName = typeMap[filterType.value] || filterType.value
-    result = result.filter(m => m.mistakeType === typeName)
-  }
-  if (sortBy.value === 'count') {
-    result.sort((a, b) => b.errorCount - a.errorCount)
-  } else if (sortBy.value === 'difficulty') {
-    const diffOrder: Record<string, number> = { '困难': 3, '中等': 2, '简单': 1 }
-    result.sort((a, b) => (diffOrder[b.difficulty] || 0) - (diffOrder[a.difficulty] || 0))
-  }
-  return result
-})
-
-const viewMistakeDetail = (mistake: any) => {
-  selectedMistake.value = mistake
-  showAnalysisDialog.value = true
-}
-
-const reviewMistake = (mistake: any) => {
-  ElMessage.success(`开始复习：${mistake.title}，AI将为你生成针对性练习`)
-}
-
-const viewAnalysis = (mistake: any) => {
-  selectedMistake.value = mistake
-  showAnalysisDialog.value = true
-}
-
-const uploadMistake = () => {
-  const content = uploadContent.value.trim()
-  if (!content) {
-    ElMessage.warning('请输入错题内容')
-    return
-  }
-  if (!uploadSubject.value) {
-    ElMessage.warning('请选择学科')
-    return
-  }
-  const subjectMap: Record<string, string> = {
-    'math': '高等数学', 'linear': '线性代数', 'english': '英语', 'major': '专业课',
-  }
-  const diffMap: Record<string, string> = {
-    'easy': '简单', 'medium': '中等', 'hard': '困难',
-  }
-  const subjectName = subjectMap[uploadSubject.value] || uploadSubject.value
-  const difficultyName = diffMap[uploadDifficulty.value] || '中等'
-  const newMistake = {
-    id: Date.now(),
-    title: uploadTitle.value.trim() || content.slice(0, 30) + (content.length > 30 ? '...' : ''),
-    content,
-    subject: subjectName,
-    mistakeType: '概念混淆',
-    errorCount: 1,
-    difficulty: difficultyName,
-    addTime: new Date().toISOString().slice(0, 10),
-    icon: 'Document',
-    iconBg: 'bg-primary/20',
-    iconColor: 'text-primary',
-    borderColor: 'border-primary',
-    tagType: 'primary',
-    typeTagClass: 'bg-primary/30 border-primary/50',
-    analysis: null,
-  }
-  mistakes.value.unshift(newMistake)
-  stats.value.total++
-  stats.value.pending++
-  showUploadDialog.value = false
-  uploadContent.value = ''
-  uploadTitle.value = ''
-  uploadSubject.value = ''
-  uploadDifficulty.value = ''
-  ElMessage.success('错题已上传，AI正在分析中...')
-}
-
-const startReview = () => {
-  ElMessage.info('复习模式已启动，请选择待复习的错题')
-}
+  ],
+}))
 
 onMounted(async () => {
-  try {
-    const data = await mistakeApi.getList(1, { pageNum: 1, pageSize: 50 })
-    if (data && data.list) {
-      mistakes.value = data.list.map((m: any) => ({
-        id: m.id || Date.now(),
-        title: m.title || '',
-        content: m.content || '',
-        subject: m.subject || '',
-        mistakeType: m.mistakeType || '概念混淆',
-        errorCount: m.errorCount || 1,
-        difficulty: m.difficulty || '中等',
-        addTime: (m.createTime || '').slice(0, 10),
-        icon: 'Document',
-        iconBg: 'bg-primary/20',
-        iconColor: 'text-primary',
-        borderColor: 'border-primary',
-        tagType: 'primary',
-        typeTagClass: 'bg-primary/30 border-primary/50',
-        analysis: null,
-      }))
-      totalMistakes.value = data.total || mistakes.value.length
-    }
-    const apiStats = await mistakeApi.getStats()
-    if (apiStats) {
-      stats.value = {
-        total: Number(apiStats.total) || 0,
-        pending: Number(apiStats.pending) || 0,
-        mastered: Number(apiStats.mastered) || 0,
-        accuracy: Number(apiStats.accuracy) || 0,
-      }
-    }
-  } catch {
-    // 后端不可用，保持默认数据
-  } finally {
-    loading.value = false
-  }
+  await Promise.all([userStore.loadDNA(), reload()])
+  loading.value = false
 })
+
+onBeforeUnmount(() => {
+  stopAllPolling()
+})
+
+const reload = async () => {
+  const userId = getUserId()
+  const [listResult, statsResult] = await Promise.all([
+    mistakeApi.getList(userId, { pageNum: 1, pageSize: 100 }),
+    mistakeApi.getStats(userId),
+  ])
+
+  mistakes.value = Array.isArray(listResult.list)
+    ? listResult.list.map((item: any) => mapMistakeItem(item))
+    : []
+
+  stats.value = {
+    total: Number(statsResult.total) || 0,
+    pending: Number(statsResult.pending) || 0,
+    reviewing: Number(statsResult.reviewing) || 0,
+    mastered: Number(statsResult.mastered) || 0,
+    improvement: Number(statsResult.improvement) || 0,
+    typeDistribution: Array.isArray(statsResult.typeDistribution) ? statsResult.typeDistribution : [],
+    subjectDistribution: Array.isArray(statsResult.subjectDistribution) ? statsResult.subjectDistribution : [],
+  }
+
+  syncPollingState()
+}
+
+const createMistake = async () => {
+  if (!form.value.title.trim() || !form.value.content.trim() || !form.value.subject) {
+    ElMessage.warning('请填写完整的错题信息')
+    return
+  }
+
+  saving.value = true
+  try {
+    await mistakeApi.addMistake({
+      title: form.value.title.trim(),
+      content: form.value.content.trim(),
+      subject: form.value.subject,
+      mistakeType: form.value.mistakeType,
+      errorCount: form.value.errorCount,
+      difficulty: form.value.difficulty,
+      status: 'pending',
+    })
+
+    showCreateDialog.value = false
+    form.value = {
+      title: '',
+      content: '',
+      subject: '',
+      mistakeType: '概念混淆',
+      errorCount: 1,
+      difficulty: '中等',
+    }
+    await reload()
+    ElMessage.success('错题已保存')
+  } catch (error) {
+    ElMessage.error(resolveErrorMessage(error, '错题保存失败，请稍后重试'))
+  } finally {
+    saving.value = false
+  }
+}
+
+const analyzeMistake = async (mistake: MistakeItem) => {
+  analyzingId.value = mistake.id
+
+  try {
+    const dna = userStore.learningDNA.type
+      ? `${userStore.learningDNA.type} ${userStore.learningDNA.radarData.map(item => `${item.name}${item.value}`).join(' ')}`
+      : ''
+
+    const result = await mistakeApi.analyzeMistake(mistake.id, dna)
+
+    const target = mistakes.value.find(item => item.id === mistake.id)
+    if (target) {
+      target.aiAnalysis = ANALYSIS_PENDING_TEXT
+    }
+
+    if (!expandedAnalysisIds.value.includes(mistake.id)) {
+      expandedAnalysisIds.value.push(mistake.id)
+    }
+
+    if (selectedMistake.value?.id === mistake.id) {
+      selectedMistake.value = { ...selectedMistake.value, aiAnalysis: ANALYSIS_PENDING_TEXT }
+    }
+
+    startAnalysisPolling(mistake.id)
+    ElMessage.info(result.message || '已提交 AI 分析请求，请稍后查看结果')
+  } catch (error) {
+    ElMessage.error(resolveErrorMessage(error, 'AI 服务异常，请稍后重试'))
+  } finally {
+    analyzingId.value = null
+  }
+}
+
+const openAnalysis = (mistake: MistakeItem) => {
+  selectedMistake.value = { ...mistake }
+  showAnalysisDialog.value = true
+}
+
+const toggleAnalysis = (id: number) => {
+  if (expandedAnalysisIds.value.includes(id)) {
+    expandedAnalysisIds.value = expandedAnalysisIds.value.filter(item => item !== id)
+  } else {
+    expandedAnalysisIds.value.push(id)
+  }
+}
+
+const mapMistakeItem = (item: any): MistakeItem => ({
+  id: Number(item.id) || Date.now(),
+  title: item.title || '未命名错题',
+  content: item.content || '',
+  subject: item.subject || '未分类',
+  mistakeType: item.mistakeType || '未分类',
+  errorCount: Number(item.errorCount) || 1,
+  difficulty: item.difficulty || '',
+  status: item.status || 'pending',
+  aiAnalysis: item.aiAnalysis || '',
+  createTime: item.createTime || '',
+})
+
+const syncPollingState = () => {
+  const pendingIds = mistakes.value
+    .filter(item => isAnalysisPendingText(item.aiAnalysis))
+    .map(item => item.id)
+
+  pendingIds.forEach(id => startAnalysisPolling(id))
+
+  Array.from(pollingTimers.keys()).forEach((id) => {
+    if (!pendingIds.includes(id)) {
+      stopAnalysisPolling(id)
+    }
+  })
+}
+
+const startAnalysisPolling = (id: number) => {
+  if (pollingTimers.has(id)) {
+    addPendingId(id)
+    return
+  }
+
+  addPendingId(id)
+  scheduleAnalysisPoll(id, 0)
+}
+
+const scheduleAnalysisPoll = (id: number, attempt: number) => {
+  const timer = window.setTimeout(async () => {
+    try {
+      const detail = await mistakeApi.getDetail(id)
+      applyMistakeDetail(detail)
+
+      if (isAnalysisPendingText(detail.aiAnalysis)) {
+        if (attempt + 1 >= ANALYSIS_POLL_MAX_COUNT) {
+          stopAnalysisPolling(id)
+          ElMessage.warning('AI 分析仍在处理中，请稍后刷新查看')
+          return
+        }
+        scheduleAnalysisPoll(id, attempt + 1)
+        return
+      }
+
+      stopAnalysisPolling(id)
+
+      if (looksLikeAiFailure(detail.aiAnalysis)) {
+        ElMessage.error('AI 服务异常，请稍后重试')
+        return
+      }
+
+      if (detail.aiAnalysis && !expandedAnalysisIds.value.includes(id)) {
+        expandedAnalysisIds.value.push(id)
+      }
+
+      ElMessage.success('AI 分析完成')
+    } catch (error) {
+      stopAnalysisPolling(id)
+      ElMessage.error(resolveErrorMessage(error, '分析结果获取失败，请稍后重试'))
+    }
+  }, ANALYSIS_POLL_INTERVAL)
+
+  pollingTimers.set(id, timer)
+}
+
+const stopAnalysisPolling = (id: number) => {
+  const timer = pollingTimers.get(id)
+  if (timer) {
+    window.clearTimeout(timer)
+    pollingTimers.delete(id)
+  }
+  analysisPendingIds.value = analysisPendingIds.value.filter(item => item !== id)
+}
+
+const stopAllPolling = () => {
+  Array.from(pollingTimers.keys()).forEach(id => stopAnalysisPolling(id))
+}
+
+const applyMistakeDetail = (detail: any) => {
+  const mapped = mapMistakeItem(detail)
+  const index = mistakes.value.findIndex(item => item.id === mapped.id)
+  if (index >= 0) {
+    mistakes.value[index] = mapped
+  } else {
+    mistakes.value.unshift(mapped)
+  }
+
+  if (selectedMistake.value?.id === mapped.id) {
+    selectedMistake.value = { ...selectedMistake.value, ...mapped }
+  }
+}
+
+const addPendingId = (id: number) => {
+  if (!analysisPendingIds.value.includes(id)) {
+    analysisPendingIds.value = [...analysisPendingIds.value, id]
+  }
+}
+
+const isAnalysisPending = (id: number) => {
+  return analysisPendingIds.value.includes(id)
+}
+
+const isAnalysisLoading = (id: number) => {
+  return analyzingId.value === id || isAnalysisPending(id)
+}
+
+const isAnalysisPendingText = (value?: string) => {
+  return value?.trim().startsWith(ANALYSIS_PENDING_PREFIX) || false
+}
+
+const looksLikeAiFailure = (value?: string) => {
+  const text = value?.trim()
+  return !text || text.startsWith(ANALYSIS_FAILURE_PREFIX) || text.includes('AI服务暂时不可用')
+}
+
+const resolveErrorMessage = (error: unknown, fallback: string) => {
+  return error instanceof Error && error.message ? error.message : fallback
+}
+
+const getUserId = () => {
+  try {
+    const stored = localStorage.getItem('cognia-user')
+    const parsed = stored ? JSON.parse(stored) : null
+    return Number(parsed?.id) || 1
+  } catch {
+    return 1
+  }
+}
+
+const statusLabel = (status?: string) => {
+  if (status === 'mastered') return '已掌握'
+  if (status === 'reviewing') return '复习中'
+  return '待复习'
+}
+
+const statusTagType = (status?: string) => {
+  if (status === 'mastered') return 'success'
+  if (status === 'reviewing') return 'warning'
+  return 'info'
+}
+
+const formatDate = (value?: string) => {
+  if (!value) return '未知时间'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
 </script>

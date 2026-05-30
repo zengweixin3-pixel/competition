@@ -1,11 +1,7 @@
 <template>
   <div class="space-y-6" v-loading="loading">
     <!-- 页面标题 -->
-    <div class="flex items-center justify-between">
-      <div>
-        <h2 class="text-2xl font-bold text-text-primary">学习人格分析</h2>
-        <p class="text-text-muted mt-1">深入了解你的学习DNA，发现最适合你的学习方式</p>
-      </div>
+    <div class="flex items-center justify-end">
       <el-button type="primary" size="large" class="gradient-primary border-0" @click="startAssessment">
         <el-icon class="mr-2"><Refresh /></el-icon>{{ showQuestionnaire ? '测评中...' : '重新测评' }}
       </el-button>
@@ -71,8 +67,20 @@
       </div>
     </div>
 
+    <!-- 未测评引导 -->
+    <div v-if="!dna.type && !showQuestionnaire" class="card-gradient rounded-2xl p-12 text-center">
+      <div class="text-6xl mb-6">🧬</div>
+      <h3 class="text-2xl font-bold text-text-primary mb-3">还没有学习人格数据</h3>
+      <p class="text-text-secondary mb-8 max-w-md mx-auto">
+        完成10道简单的测评题目，AI将分析你的学习习惯、能力和偏好，生成专属于你的学习人格报告
+      </p>
+      <el-button type="primary" size="large" class="gradient-primary border-0" @click="startAssessment">
+        <el-icon class="mr-2"><Refresh /></el-icon>开始测评
+      </el-button>
+    </div>
+
     <!-- 核心人格卡片 -->
-    <div class="grid grid-cols-12 gap-6">
+    <div v-if="dna.type" class="grid grid-cols-12 gap-6">
       <!-- 人格类型主卡片 -->
       <div class="col-span-5 card-gradient rounded-2xl p-8 relative overflow-hidden">
         <div class="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-primary/20 to-accent-purple/20 rounded-full blur-3xl -mr-32 -mt-32"></div>
@@ -129,7 +137,7 @@
     </div>
 
     <!-- 优势与风险分析 -->
-    <div class="grid grid-cols-2 gap-6">
+    <div v-if="dna.type" class="grid grid-cols-2 gap-6">
       <!-- 优势分析 -->
       <div class="card-gradient rounded-2xl p-6 border-l-4 border-emerald-500">
         <div class="flex items-center gap-3 mb-6">
@@ -180,7 +188,7 @@
     </div>
 
     <!-- AI个性化建议 -->
-    <div class="card-gradient rounded-2xl p-6">
+    <div v-if="dna.type" class="card-gradient rounded-2xl p-6">
       <div class="flex items-center gap-3 mb-6">
         <div class="w-12 h-12 rounded-xl bg-gradient-primary flex items-center justify-center">
           <el-icon class="text-white text-2xl"><MagicStick /></el-icon>
@@ -206,7 +214,7 @@
     </div>
 
     <!-- 学习历史趋势 -->
-    <div class="card-gradient rounded-2xl p-6">
+    <div v-if="dna.type" class="card-gradient rounded-2xl p-6">
       <div class="flex items-center justify-between mb-6">
         <div>
           <h3 class="font-bold text-text-primary text-lg">学习人格演变趋势</h3>
@@ -224,7 +232,7 @@
     </div>
 
     <!-- 人格对比 -->
-    <div class="card-gradient rounded-2xl p-6">
+    <div v-if="dna.type" class="card-gradient rounded-2xl p-6">
       <div class="flex items-center justify-between mb-6">
         <div>
           <h3 class="font-bold text-text-primary text-lg">与同类学习者对比</h3>
@@ -270,9 +278,11 @@ import {
   Aim,
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import { userApi } from '@/api'
 
 use([CanvasRenderer, RadarChart, LineChart, GridComponent, TooltipComponent, LegendComponent, RadarComponent])
 
+const DNA_STORAGE_KEY = 'cognia-learning-dna'
 const loading = ref(true)
 const store = useUserStore()
 const radarTimeRange = ref('本周')
@@ -389,7 +399,7 @@ const prevQuestion = () => {
 
 const isAllAnswered = computed(() => answers.value.every(a => a > 0))
 
-const applyAssessment = () => {
+const applyAssessment = async () => {
   const scores = dimensionScores.value
   dna.value.radarData = [
     { name: '理解能力', value: scores['理解能力'] },
@@ -428,7 +438,27 @@ const applyAssessment = () => {
     { title: personality.suggestions.split(',')[2] || '先理解后刷题', desc: '先通过视频/讲解理解概念，再进行练习巩固', icon: 'Aim', bgClass: 'bg-accent-cyan/20', iconClass: 'text-accent-cyan' },
   ]
   showQuestionnaire.value = false
-  ElMessage.success('测评完成！你的学习人格已更新')
+
+  // 保存到 localStorage，确保刷新不丢失
+  const dnaSnapshot = {
+    type: dna.value.type, tags: dna.value.tags, description: dna.value.description,
+    strengthScore: dna.value.strengthScore, learningEfficiency: dna.value.learningEfficiency,
+    radarData: dna.value.radarData, strengths: dna.value.strengths, weaknesses: dna.value.weaknesses,
+    strategies: dna.value.strategies,
+  }
+  localStorage.setItem(DNA_STORAGE_KEY, JSON.stringify(dnaSnapshot))
+
+  // 同时更新 store
+  store.learningDNA.type = dna.value.type
+  store.learningDNA.radarData = dna.value.radarData
+
+  // 保存到后端
+  try {
+    await userApi.analyzeLearningDNA()
+    ElMessage.success('测评完成！学习人格已保存')
+  } catch {
+    ElMessage.success('测评完成！学习人格已保存（本地存储）')
+  }
 }
 
 const dna = ref({
@@ -628,6 +658,33 @@ onMounted(async () => {
   try {
     await Promise.all([store.loadUser(), store.loadDNA()])
   } catch { /* ignore */ }
-  finally { loading.value = false }
+
+  // 如果后端返回了空数据，尝试从 localStorage 恢复
+  if (!dna.value.type) {
+    const cached = localStorage.getItem(DNA_STORAGE_KEY)
+    if (cached) {
+      try {
+        const data = JSON.parse(cached)
+        if (data.type) dna.value.type = data.type
+        if (data.tags) dna.value.tags = data.tags
+        if (data.description) dna.value.description = data.description
+        if (data.strengthScore) dna.value.strengthScore = data.strengthScore
+        if (data.learningEfficiency) dna.value.learningEfficiency = data.learningEfficiency
+        if (data.radarData && Array.isArray(data.radarData)) {
+          dna.value.radarData = data.radarData
+        }
+        if (data.strengths && Array.isArray(data.strengths)) {
+          dna.value.strengths = data.strengths
+        }
+        if (data.weaknesses && Array.isArray(data.weaknesses)) {
+          dna.value.weaknesses = data.weaknesses
+        }
+        if (data.strategies && Array.isArray(data.strategies)) {
+          dna.value.strategies = data.strategies
+        }
+      } catch { /* ignore */ }
+    }
+  }
+  loading.value = false
 })
 </script>

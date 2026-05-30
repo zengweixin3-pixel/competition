@@ -31,6 +31,12 @@ public class StudyController {
         return Result.success();
     }
 
+    @PutMapping("/record")
+    public Result<Void> updateRecord(@RequestBody StudyRecord record) {
+        studyService.updateById(record);
+        return Result.success();
+    }
+
     @GetMapping("/trend/{userId}")
     public Result<List<Map<String, Object>>> getStudyTrend(
             @PathVariable Long userId,

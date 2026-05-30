@@ -1,313 +1,187 @@
 <template>
   <div class="space-y-6" v-loading="loading">
-    <!-- 页面标题 -->
-    <div class="flex items-center justify-between">
-      <div>
-        <h2 class="text-2xl font-bold text-text-primary">情绪中心</h2>
-        <p class="text-text-muted mt-1">记录心情，AI会更懂你哦 💜</p>
-      </div>
-      <el-button type="primary" size="large" @click="showRecordDialog = true">
-        <el-icon class="mr-2"><Plus /></el-icon>记录今日心情
-      </el-button>
+    <div class="flex items-center justify-end">
+      <el-button size="large" type="primary" @click="showRecordDialog = true">记录今日情绪</el-button>
     </div>
 
-    <!-- 情绪概览 -->
-    <div class="grid grid-cols-12 gap-6">
-      <!-- 当前情绪状态 -->
-      <div class="col-span-4 card-gradient rounded-2xl p-6">
-        <div class="flex items-center justify-between mb-6">
-          <h3 class="font-bold text-text-primary">当前情绪状态</h3>
-          <el-tag effect="dark" :class="currentEmotion.tagClass">{{ currentEmotion.label }}</el-tag>
-        </div>
-        <div class="text-center py-8">
-          <div class="text-8xl mb-4">{{ currentEmotion.icon }}</div>
-          <div class="text-2xl font-bold text-text-primary mb-2">{{ currentEmotion.title }}</div>
-          <p class="text-text-secondary">{{ currentEmotion.description }}</p>
-        </div>
-        <div class="bg-dark-bg/50 rounded-xl p-4">
-          <div class="text-sm text-text-muted mb-2">AI建议</div>
-          <p class="text-sm text-text-primary">{{ currentEmotion.suggestion }}</p>
+    <section class="grid grid-cols-1 gap-6 xl:grid-cols-3">
+      <div class="card-gradient rounded-2xl p-6">
+        <p class="text-sm text-text-muted">当前情绪</p>
+        <div class="mt-6 text-center">
+          <div class="text-7xl">{{ currentEmotion.icon }}</div>
+          <h2 class="mt-4 text-3xl font-bold text-text-primary">{{ currentEmotion.label }}</h2>
+          <p class="mt-3 text-sm leading-6 text-text-secondary">{{ currentEmotion.content }}</p>
         </div>
       </div>
 
-      <!-- 情绪趋势 -->
-      <div class="col-span-8 card-gradient rounded-2xl p-6">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="font-bold text-text-primary">情绪变化趋势</h3>
-          <el-radio-group v-model="emotionTimeRange" size="small">
-            <el-radio-button label="近7天">近7天</el-radio-button>
-            <el-radio-button label="近30天">近30天</el-radio-button>
-            <el-radio-button label="近90天">近90天</el-radio-button>
-          </el-radio-group>
+      <div class="card-gradient rounded-2xl p-6 xl:col-span-2">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-lg font-bold text-text-primary">情绪趋势</h3>
+            <p class="text-sm text-text-muted">看看最近一段时间的情绪波动</p>
+          </div>
+          <el-tag type="primary">{{ emotionStats.totalRecords }} 条记录</el-tag>
         </div>
-        <div class="h-64">
-          <v-chart class="w-full h-full" :option="emotionTrendOption" autoresize />
+        <div class="mt-6 h-72">
+          <v-chart class="h-full w-full" :option="trendOption" autoresize />
         </div>
       </div>
-    </div>
+    </section>
 
-    <!-- 情绪统计 -->
-    <div class="grid grid-cols-4 gap-6">
-      <div class="card-gradient rounded-2xl p-6">
-        <div class="flex items-center gap-4">
-          <div class="w-14 h-14 rounded-xl bg-emerald-500/20 flex items-center justify-center">
-            <span class="text-3xl">😄</span>
-          </div>
-          <div>
-            <div class="text-2xl font-bold text-text-primary">{{ emotionStats.positive }}天</div>
-            <div class="text-sm text-text-muted">积极情绪</div>
-          </div>
-        </div>
+    <section class="grid grid-cols-2 gap-6 xl:grid-cols-4">
+      <div class="card-gradient rounded-2xl p-6 text-center">
+        <p class="text-sm text-text-muted">积极情绪</p>
+        <p class="mt-3 text-3xl font-bold text-text-primary">{{ emotionStats.positive }}</p>
       </div>
-      <div class="card-gradient rounded-2xl p-6">
-        <div class="flex items-center gap-4">
-          <div class="w-14 h-14 rounded-xl bg-amber-500/20 flex items-center justify-center">
-            <span class="text-3xl">😐</span>
-          </div>
-          <div>
-            <div class="text-2xl font-bold text-text-primary">{{ emotionStats.neutral }}天</div>
-            <div class="text-sm text-text-muted">平静情绪</div>
-          </div>
-        </div>
+      <div class="card-gradient rounded-2xl p-6 text-center">
+        <p class="text-sm text-text-muted">平稳情绪</p>
+        <p class="mt-3 text-3xl font-bold text-text-primary">{{ emotionStats.neutral }}</p>
       </div>
-      <div class="card-gradient rounded-2xl p-6">
-        <div class="flex items-center gap-4">
-          <div class="w-14 h-14 rounded-xl bg-rose-500/20 flex items-center justify-center">
-            <span class="text-3xl">😫</span>
-          </div>
-          <div>
-            <div class="text-2xl font-bold text-text-primary">{{ emotionStats.negative }}天</div>
-            <div class="text-sm text-text-muted">消极情绪</div>
-          </div>
-        </div>
+      <div class="card-gradient rounded-2xl p-6 text-center">
+        <p class="text-sm text-text-muted">低落情绪</p>
+        <p class="mt-3 text-3xl font-bold text-text-primary">{{ emotionStats.negative }}</p>
       </div>
-      <div class="card-gradient rounded-2xl p-6">
-        <div class="flex items-center gap-4">
-          <div class="w-14 h-14 rounded-xl bg-primary/20 flex items-center justify-center">
-            <el-icon class="text-primary text-2xl"><TrendCharts /></el-icon>
-          </div>
-          <div>
-            <div class="text-2xl font-bold text-text-primary">{{ emotionStats.stability }}%</div>
-            <div class="text-sm text-text-muted">情绪稳定度</div>
-          </div>
-        </div>
+      <div class="card-gradient rounded-2xl p-6 text-center">
+        <p class="text-sm text-text-muted">稳定度</p>
+        <p class="mt-3 text-3xl font-bold text-text-primary">{{ emotionStats.stability }}%</p>
       </div>
-    </div>
+    </section>
 
-    <!-- 情绪与学习关联分析 -->
-    <div class="grid grid-cols-12 gap-6">
-      <div class="col-span-6 card-gradient rounded-2xl p-6">
-        <h3 class="font-bold text-text-primary mb-4">情绪与学习效率关联</h3>
-        <div class="h-64">
-          <v-chart class="w-full h-full" :option="correlationOption" autoresize />
+    <section class="card-gradient rounded-2xl p-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 class="text-lg font-bold text-text-primary">情绪日记</h3>
+          <p class="text-sm text-text-muted">记录一下最近的状态和感受</p>
         </div>
+        <el-button link type="primary" @click="reload">刷新</el-button>
       </div>
-      <div class="col-span-6 card-gradient rounded-2xl p-6">
-        <h3 class="font-bold text-text-primary mb-4">不同时段情绪分布</h3>
-        <div class="h-64">
-          <v-chart class="w-full h-full" :option="timeDistributionOption" autoresize />
-        </div>
-      </div>
-    </div>
-
-    <!-- 情绪日记 -->
-    <div class="card-gradient rounded-2xl p-6">
-      <div class="flex items-center justify-between mb-6">
-        <h3 class="font-bold text-text-primary">情绪日记</h3>
-        <el-radio-group v-model="diaryTimeRange" size="small">
-          <el-radio-button label="全部">全部</el-radio-button>
-          <el-radio-button label="本月">本月</el-radio-button>
-          <el-radio-button label="上月">上月</el-radio-button>
-        </el-radio-group>
-      </div>
-      <div class="space-y-4">
-        <div v-for="record in emotionRecords" :key="record.id" class="flex gap-4 p-4 bg-dark-bg/50 rounded-xl">
-          <div class="w-16 text-center">
-            <div class="text-3xl mb-1">{{ record.icon }}</div>
-            <div class="text-xs text-text-muted">{{ record.time }}</div>
-          </div>
-          <div class="flex-1">
-            <div class="flex items-center gap-3 mb-2">
-              <span class="font-medium text-text-primary">{{ record.title }}</span>
-              <el-tag size="small" :class="record.tagClass">{{ record.label }}</el-tag>
-            </div>
-            <p class="text-sm text-text-secondary mb-3">{{ record.content }}</p>
-            <div v-if="record.aiResponse" class="bg-primary/10 rounded-lg p-3 border border-primary/20">
-              <div class="flex items-start gap-2">
-                <el-icon class="text-primary mt-0.5"><ChatDotRound /></el-icon>
-                <p class="text-sm text-text-primary">{{ record.aiResponse }}</p>
+      <div class="mt-5 space-y-4">
+        <div v-for="record in emotionRecords" :key="record.id" class="rounded-2xl bg-dark-bg/50 p-5">
+          <div class="flex items-start gap-4">
+            <div class="text-4xl">{{ emotionMeta(record.emotionType).icon }}</div>
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center justify-between gap-4">
+                <div>
+                  <p class="text-sm font-medium text-text-primary">{{ record.emotionLabel }}</p>
+                  <p class="mt-1 text-xs text-text-muted">{{ formatDate(record.recordDate || record.createTime) }}</p>
+                </div>
+                <el-tag size="small">{{ record.relatedActivity || '未填写活动' }}</el-tag>
+              </div>
+              <p class="mt-3 text-sm leading-6 text-text-secondary">{{ record.content || '未填写内容' }}</p>
+              <div v-if="record.aiResponse" class="mt-4 rounded-2xl border border-primary/20 bg-primary/10 p-4">
+                <p class="text-xs text-primary">AI 回应</p>
+                <p class="mt-2 text-sm leading-6 text-text-primary">{{ record.aiResponse }}</p>
               </div>
             </div>
           </div>
         </div>
+        <el-empty v-if="emotionRecords.length === 0" description="暂无情绪记录" />
       </div>
-    </div>
+    </section>
 
-    <!-- 情绪调节建议 -->
-    <div class="card-gradient rounded-2xl p-6">
-      <div class="flex items-center gap-3 mb-6">
-        <div class="w-12 h-12 rounded-xl bg-gradient-primary flex items-center justify-center">
-          <el-icon class="text-white text-2xl"><MagicStick /></el-icon>
-        </div>
-        <div>
-          <h3 class="font-bold text-text-primary text-lg">AI情绪调节建议</h3>
-          <p class="text-sm text-text-muted">基于你的情绪历史，为你定制的调节方案</p>
-        </div>
-      </div>
-      <div class="grid grid-cols-3 gap-6">
-        <div class="bg-dark-bg/50 rounded-xl p-6">
-          <div class="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center mb-4">
-            <el-icon class="text-emerald-400 text-2xl"><Sunny /></el-icon>
-          </div>
-          <h4 class="font-bold text-text-primary mb-2">当感到焦虑时</h4>
-          <ul class="space-y-2 text-sm text-text-secondary">
-            <li>• 尝试5分钟深呼吸练习</li>
-            <li>• 将大任务分解为小目标</li>
-            <li>• 听轻音乐放松心情</li>
-            <li>• 适当休息，不要强迫自己</li>
-          </ul>
-        </div>
-        <div class="bg-dark-bg/50 rounded-xl p-6">
-          <div class="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center mb-4">
-            <el-icon class="text-primary text-2xl"><Moon /></el-icon>
-          </div>
-          <h4 class="font-bold text-text-primary mb-2">当感到疲惫时</h4>
-          <ul class="space-y-2 text-sm text-text-secondary">
-            <li>• 进行15分钟小憩</li>
-            <li>• 做一些轻度拉伸运动</li>
-            <li>• 切换到轻松的学习内容</li>
-            <li>• 喝一杯温水或茶</li>
-          </ul>
-        </div>
-        <div class="bg-dark-bg/50 rounded-xl p-6">
-          <div class="w-12 h-12 rounded-xl bg-accent-purple/20 flex items-center justify-center mb-4">
-            <el-icon class="text-accent-purple text-2xl"><Star /></el-icon>
-          </div>
-          <h4 class="font-bold text-text-primary mb-2">当感到烦躁时</h4>
-          <ul class="space-y-2 text-sm text-text-secondary">
-            <li>• 暂停学习，出去走走</li>
-            <li>• 与朋友或家人聊聊天</li>
-            <li>• 写下让你烦躁的事情</li>
-            <li>• 换个环境继续学习</li>
-          </ul>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 记录情绪对话框 -->
-  <el-dialog v-model="showRecordDialog" title="记录今日心情" width="500px" destroy-on-close>
-    <div class="space-y-6">
-      <div>
-        <div class="text-sm text-text-primary mb-4">你现在感觉如何？</div>
-        <div class="flex justify-between">
-          <div
+    <el-dialog v-model="showRecordDialog" title="记录今日情绪" width="520px" destroy-on-close>
+      <div class="space-y-5">
+        <div class="flex flex-wrap gap-3">
+          <button
             v-for="emotion in emotions"
             :key="emotion.value"
-            class="flex flex-col items-center gap-2 cursor-pointer p-3 rounded-xl transition-all"
-            :class="selectedEmotion === emotion.value ? 'bg-primary/20 border border-primary/50' : 'hover:bg-dark-border/50 border border-transparent'"
+            type="button"
+            class="flex min-w-[90px] flex-col items-center rounded-2xl border px-4 py-3 transition"
+            :class="selectedEmotion === emotion.value ? 'border-primary bg-primary/10' : 'border-dark-border bg-dark-bg/50'"
             @click="selectedEmotion = emotion.value"
           >
-            <div class="text-4xl">{{ emotion.icon }}</div>
-            <span class="text-sm" :class="selectedEmotion === emotion.value ? 'text-primary' : 'text-text-muted'">{{ emotion.label }}</span>
-          </div>
+            <span class="text-3xl">{{ emotion.icon }}</span>
+            <span class="mt-2 text-xs text-text-secondary">{{ emotion.label }}</span>
+          </button>
         </div>
-      </div>
-      <div>
-        <div class="text-sm text-text-primary mb-2">详细描述（可选）</div>
-        <el-input
-          v-model="emotionNote"
-          type="textarea"
-          :rows="4"
-          placeholder="描述一下你现在的状态，比如：今天学习有点累，但是收获也很大..."
-        />
-      </div>
-      <div>
-        <div class="text-sm text-text-primary mb-2">关联的学习活动</div>
-        <el-select v-model="relatedActivity" placeholder="选择相关活动" class="w-full">
-          <el-option label="高数学习" value="math" />
-          <el-option label="英语学习" value="english" />
-          <el-option label="专业课学习" value="major" />
-          <el-option label="复习错题" value="review" />
-          <el-option label="其他" value="other" />
+        <el-select v-model="relatedActivity" class="w-full" placeholder="关联学习活动">
+          <el-option label="高等数学" value="高等数学" />
+          <el-option label="线性代数" value="线性代数" />
+          <el-option label="英语" value="英语" />
+          <el-option label="专业课" value="专业课" />
+          <el-option label="错题复盘" value="错题复盘" />
         </el-select>
+        <el-input v-model="emotionNote" type="textarea" :rows="4" placeholder="写下你现在的状态和感受..." />
       </div>
-    </div>
-    <template #footer>
-      <el-button @click="showRecordDialog = false">取消</el-button>
-      <el-button type="primary" @click="saveEmotionRecord">保存记录</el-button>
-    </template>
-  </el-dialog>
+      <template #footer>
+        <el-button @click="showRecordDialog = false">取消</el-button>
+        <el-button type="primary" :loading="saving" @click="saveEmotionRecord">保存记录</el-button>
+      </template>
+    </el-dialog>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { use } from 'echarts/core'
+import { LineChart } from 'echarts/charts'
+import { GridComponent, TooltipComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
-import { LineChart, ScatterChart, BarChart } from 'echarts/charts'
-import { GridComponent, TooltipComponent, LegendComponent } from 'echarts/components'
 import VChart from 'vue-echarts'
-import {
-  Plus,
-  TrendCharts,
-  MagicStick,
-  ChatDotRound,
-  Sunny,
-  Moon,
-  Star,
-} from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { emotionApi } from '@/api'
 
-use([CanvasRenderer, LineChart, ScatterChart, BarChart, GridComponent, TooltipComponent, LegendComponent])
+use([CanvasRenderer, LineChart, GridComponent, TooltipComponent])
+
+type EmotionRecordItem = {
+  id?: number
+  emotionType: string
+  emotionLabel: string
+  content?: string
+  relatedActivity?: string
+  aiResponse?: string
+  recordDate?: string
+  createTime?: string
+  emotionScore?: number
+}
 
 const loading = ref(true)
-const emotionTimeRange = ref('近7天')
-const diaryTimeRange = ref('全部')
+const saving = ref(false)
 const showRecordDialog = ref(false)
 const selectedEmotion = ref('')
 const emotionNote = ref('')
 const relatedActivity = ref('')
-
-const currentEmotion = ref({
-  label: '还不错',
-  icon: '🙂',
-  title: '状态良好',
-  description: '你的情绪状态不错，适合继续学习',
-  suggestion: '保持当前的学习节奏，可以尝试一些稍微有挑战性的内容',
-  tagClass: 'bg-emerald-500/30 border-emerald-500/50 text-emerald-400',
-})
-
+const emotionRecords = ref<EmotionRecordItem[]>([])
 const emotionStats = ref({
-  positive: 18,
-  neutral: 7,
-  negative: 5,
-  stability: 78,
+  totalRecords: 0,
+  positive: 0,
+  neutral: 0,
+  negative: 0,
+  stability: 0,
 })
 
 const emotions = [
-  { label: '超棒', value: 'great', icon: '😄' },
-  { label: '还不错', value: 'good', icon: '🙂' },
-  { label: '一般', value: 'normal', icon: '😐' },
-  { label: '有点累', value: 'tired', icon: '😔' },
-  { label: '很烦躁', value: 'frustrated', icon: '😫' },
+  { label: '超棒', value: 'great', icon: '😄', score: 5 },
+  { label: '还不错', value: 'good', icon: '🙂', score: 4 },
+  { label: '一般', value: 'normal', icon: '😐', score: 3 },
+  { label: '有点累', value: 'tired', icon: '😔', score: 2 },
+  { label: '很烦躁', value: 'frustrated', icon: '😫', score: 1 },
 ]
 
-const emotionTrendOption = {
-  grid: { top: 20, right: 20, bottom: 40, left: 50 },
-  tooltip: {
-    trigger: 'axis',
-    backgroundColor: 'rgba(17, 24, 39, 0.9)',
-    borderColor: '#374151',
-    textStyle: { color: '#f9fafb' },
-    formatter: (params: any) => {
-      const emotionMap: Record<number, string> = { 5: '😄', 4: '🙂', 3: '😐', 2: '😔', 1: '😫' }
-      return `${params[0].axisValue}<br/>情绪指数: ${params[0].value} ${emotionMap[params[0].value]}`
-    },
-  },
+const currentEmotion = computed(() => {
+  const latest = emotionRecords.value[0]
+  if (!latest) {
+    return {
+      label: '暂无记录',
+      icon: '🫥',
+      content: '记录一次真实情绪后，这里会显示你的最新状态。',
+    }
+  }
+  return {
+    label: latest.emotionLabel,
+    icon: emotionMeta(latest.emotionType).icon,
+    content: latest.content || '已记录情绪',
+  }
+})
+
+const trendOption = computed(() => ({
+  grid: { top: 20, right: 20, bottom: 24, left: 36 },
+  tooltip: { trigger: 'axis' },
   xAxis: {
     type: 'category',
-    data: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
+    data: emotionRecords.value.length
+      ? [...emotionRecords.value].reverse().map(item => formatDate(item.recordDate || item.createTime, true))
+      : ['暂无数据'],
     axisLine: { lineStyle: { color: '#374151' } },
     axisLabel: { color: '#6b7280' },
   },
@@ -317,246 +191,111 @@ const emotionTrendOption = {
     max: 5,
     axisLine: { show: false },
     splitLine: { lineStyle: { color: '#1f2937' } },
-    axisLabel: {
-      color: '#6b7280',
-      formatter: (value: number) => {
-        const map: Record<number, string> = { 5: '😄', 4: '🙂', 3: '😐', 2: '😔', 1: '😫' }
-        return map[value] || ''
-      },
-    },
-  },
-  series: [{
-    data: [4, 3, 4, 5, 4, 3, 4],
-    type: 'line',
-    smooth: true,
-    symbol: 'circle',
-    symbolSize: 10,
-    lineStyle: {
-      color: '#6366f1',
-      width: 3,
-    },
-    itemStyle: {
-      color: '#6366f1',
-      borderWidth: 2,
-      borderColor: '#fff',
-    },
-    areaStyle: {
-      color: {
-        type: 'linear',
-        x: 0, y: 0, x2: 0, y2: 1,
-        colorStops: [
-          { offset: 0, color: 'rgba(99, 102, 241, 0.4)' },
-          { offset: 1, color: 'rgba(99, 102, 241, 0)' },
-        ],
-      },
-    },
-  }],
-}
-
-const correlationOption = {
-  grid: { top: 20, right: 20, bottom: 40, left: 50 },
-  tooltip: {
-    trigger: 'item',
-    backgroundColor: 'rgba(17, 24, 39, 0.9)',
-    borderColor: '#374151',
-    textStyle: { color: '#f9fafb' },
-  },
-  xAxis: {
-    type: 'value',
-    name: '情绪指数',
-    nameTextStyle: { color: '#9ca3af' },
-    axisLine: { lineStyle: { color: '#374151' } },
-    splitLine: { lineStyle: { color: '#1f2937' } },
-    axisLabel: { color: '#6b7280' },
-  },
-  yAxis: {
-    type: 'value',
-    name: '学习效率',
-    nameTextStyle: { color: '#9ca3af' },
-    axisLine: { lineStyle: { color: '#374151' } },
-    splitLine: { lineStyle: { color: '#1f2937' } },
-    axisLabel: { color: '#6b7280' },
-  },
-  series: [{
-    type: 'scatter',
-    data: [
-      [5, 92], [4, 85], [4, 88], [3, 72], [4, 80],
-      [3, 68], [5, 95], [2, 55], [4, 82], [3, 70],
-      [5, 90], [4, 86], [2, 50], [3, 75], [4, 84],
-    ],
-    symbolSize: 12,
-    itemStyle: {
-      color: {
-        type: 'radial',
-        x: 0.5, y: 0.5, r: 0.5,
-        colorStops: [
-          { offset: 0, color: '#a855f7' },
-          { offset: 1, color: '#6366f1' },
-        ],
-      },
-      shadowBlur: 10,
-      shadowColor: 'rgba(99, 102, 241, 0.5)',
-    },
-  }],
-}
-
-const timeDistributionOption = {
-  grid: { top: 20, right: 20, bottom: 40, left: 50 },
-  tooltip: {
-    trigger: 'axis',
-    backgroundColor: 'rgba(17, 24, 39, 0.9)',
-    borderColor: '#374151',
-    textStyle: { color: '#f9fafb' },
-  },
-  legend: {
-    data: ['积极', '平静', '消极'],
-    bottom: 0,
-    textStyle: { color: '#9ca3af' },
-  },
-  xAxis: {
-    type: 'category',
-    data: ['早晨', '上午', '中午', '下午', '傍晚', '晚上', '深夜'],
-    axisLine: { lineStyle: { color: '#374151' } },
-    axisLabel: { color: '#6b7280' },
-  },
-  yAxis: {
-    type: 'value',
-    axisLine: { show: false },
-    splitLine: { lineStyle: { color: '#1f2937' } },
     axisLabel: { color: '#6b7280' },
   },
   series: [
     {
-      name: '积极',
-      type: 'bar',
-      stack: 'total',
-      data: [3, 5, 2, 4, 6, 8, 4],
-      itemStyle: { color: '#10b981' },
-    },
-    {
-      name: '平静',
-      type: 'bar',
-      stack: 'total',
-      data: [4, 3, 5, 4, 3, 2, 3],
+      type: 'line',
+      smooth: true,
+      data: emotionRecords.value.length
+        ? [...emotionRecords.value].reverse().map(item => Number(item.emotionScore) || emotionMeta(item.emotionType).score)
+        : [0],
+      lineStyle: { color: '#6366f1', width: 3 },
       itemStyle: { color: '#6366f1' },
-    },
-    {
-      name: '消极',
-      type: 'bar',
-      stack: 'total',
-      data: [1, 2, 1, 2, 1, 2, 3],
-      itemStyle: { color: '#f43f5e' },
+      areaStyle: {
+        color: {
+          type: 'linear',
+          x: 0,
+          y: 0,
+          x2: 0,
+          y2: 1,
+          colorStops: [
+            { offset: 0, color: 'rgba(99,102,241,0.35)' },
+            { offset: 1, color: 'rgba(99,102,241,0.02)' },
+          ],
+        },
+      },
     },
   ],
-}
-
-const emotionRecords = ref([
-  {
-    id: 1,
-    icon: '🙂',
-    time: '今天 20:30',
-    title: '学习状态不错',
-    label: '还不错',
-    tagClass: 'bg-emerald-500/30 border-emerald-500/50 text-emerald-400',
-    content: '今天学习有点累，但是收获也很大！完成了定积分的复习，感觉对几何意义的理解更深了。',
-    aiResponse: '太棒了！你的努力正在积累成果。建议你现在可以稍微休息一下，让大脑消化今天学到的知识。',
-  },
-  {
-    id: 2,
-    icon: '😔',
-    time: '昨天 15:20',
-    title: '有点疲惫',
-    label: '有点累',
-    tagClass: 'bg-amber-500/30 border-amber-500/50 text-amber-400',
-    content: '连续学了3个小时，感觉有点疲惫，注意力不太集中了。',
-    aiResponse: '学习疲劳是正常的！根据你的学习人格，建议采用番茄工作法，每25分钟休息5分钟。现在可以起来活动一下，喝杯水。',
-  },
-  {
-    id: 3,
-    icon: '😄',
-    time: '前天 21:00',
-    title: '攻克难题的喜悦',
-    label: '超棒',
-    tagClass: 'bg-primary/30 border-primary/50 text-primary',
-    content: '终于搞懂了矩阵乘法的原理！原来一直搞混了行列的对应关系，现在豁然开朗。',
-    aiResponse: '恭喜你！这种顿悟的感觉是学习中最美妙的时刻。建议你现在趁热打铁，做几道相关练习题巩固一下。',
-  },
-])
-
-const getAIResponse = (emotionValue: string) => {
-  const map: Record<string, string> = {
-    'great': '太棒了！保持这样的状态，学习效率会非常高！',
-    'good': '状态不错，继续按照计划推进学习吧！',
-    'normal': '平凡的日子也很珍贵，尝试找一些学习的乐趣吧。',
-    'tired': '累了就休息一下，根据你的学习人格，建议采用25分钟番茄钟。',
-    'frustrated': '烦躁的时候不妨暂停学习，出去走走或听首喜欢的歌。',
-  }
-  return map[emotionValue] || '感谢你的记录，AI会更加了解你的学习状态。'
-}
-
-const saveEmotionRecord = () => {
-  if (!selectedEmotion.value) {
-    ElMessage.warning('请选择当前心情')
-    return
-  }
-  const emotion = emotions.find(e => e.value === selectedEmotion.value)
-  const now = new Date()
-  const timeStr = `今天 ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
-  const tagClassMap: Record<string, string> = {
-    'great': 'bg-primary/30 border-primary/50 text-primary',
-    'good': 'bg-emerald-500/30 border-emerald-500/50 text-emerald-400',
-    'normal': 'bg-blue-500/30 border-blue-500/50 text-blue-400',
-    'tired': 'bg-amber-500/30 border-amber-500/50 text-amber-400',
-    'frustrated': 'bg-rose-500/30 border-rose-500/50 text-rose-400',
-  }
-  emotionRecords.value.unshift({
-    id: Date.now(),
-    icon: emotion?.icon || '😐',
-    time: timeStr,
-    title: `心情：${emotion?.label || '一般'}`,
-    label: emotion?.label || '一般',
-    tagClass: tagClassMap[selectedEmotion.value] || 'bg-blue-500/30 border-blue-500/50 text-blue-400',
-    content: emotionNote.value || '今天没有特别的感受',
-    aiResponse: getAIResponse(selectedEmotion.value),
-  })
-  showRecordDialog.value = false
-  selectedEmotion.value = ''
-  emotionNote.value = ''
-  relatedActivity.value = ''
-  ElMessage.success('心情已记录，AI会更懂你哦')
-}
+}))
 
 onMounted(async () => {
-  try {
-    const now = new Date()
-    const start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
-    const end = now.toISOString().slice(0, 10)
-    const records = await emotionApi.getRecords(1, start, end)
-    if (records && Array.isArray(records)) {
-      emotionRecords.value = records.map((r: any) => ({
-        id: r.id || Date.now(),
-        icon: r.emotionType === 'great' ? '😄' : r.emotionType === 'good' ? '🙂' : r.emotionType === 'normal' ? '😐' : r.emotionType === 'tired' ? '😔' : '😫',
-        time: (r.recordDate || '').slice(5) || '今天',
-        title: r.emotionLabel ? `心情：${r.emotionLabel}` : '心情记录',
-        label: r.emotionLabel || '一般',
-        tagClass: 'bg-emerald-500/30 border-emerald-500/50 text-emerald-400',
-        content: r.content || '',
-        aiResponse: r.aiResponse || '',
-      }))
-    }
-    const apiStats = await emotionApi.getStats()
-    if (apiStats) {
-      emotionStats.value = {
-        positive: Number(apiStats.positive) || 0,
-        neutral: Number(apiStats.neutral) || 0,
-        negative: Number(apiStats.negative) || 0,
-        stability: Number(apiStats.stability) || 0,
-      }
-    }
-  } catch {
-    // 后端不可用
-  } finally {
-    loading.value = false
-  }
+  await reload()
+  loading.value = false
 })
+
+const reload = async () => {
+  const userId = getUserId()
+  const start = getLocalDateString(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000))
+  const end = getLocalDateString()
+  const [records, stats] = await Promise.all([
+    emotionApi.getRecords(userId, start, end),
+    emotionApi.getStats(userId),
+  ])
+  emotionRecords.value = Array.isArray(records) ? records : []
+  emotionStats.value = {
+    totalRecords: Number(stats.totalRecords) || 0,
+    positive: Number(stats.positive) || 0,
+    neutral: Number(stats.neutral) || 0,
+    negative: Number(stats.negative) || 0,
+    stability: Number(stats.stability) || 0,
+  }
+}
+
+const saveEmotionRecord = async () => {
+  if (!selectedEmotion.value) {
+    ElMessage.warning('请先选择当前情绪')
+    return
+  }
+  const emotion = emotions.find(item => item.value === selectedEmotion.value)
+  saving.value = true
+  try {
+    await emotionApi.addRecord({
+      emotionType: selectedEmotion.value,
+      emotionLabel: emotion?.label || '一般',
+      content: emotionNote.value || '今日情绪记录',
+      relatedActivity: relatedActivity.value,
+      emotionScore: emotion?.score || 3,
+    })
+    await reload()
+    showRecordDialog.value = false
+    selectedEmotion.value = ''
+    emotionNote.value = ''
+    relatedActivity.value = ''
+    ElMessage.success('情绪记录已保存')
+  } catch {
+    ElMessage.error('情绪保存失败，请稍后重试')
+  } finally {
+    saving.value = false
+  }
+}
+
+const emotionMeta = (emotionType?: string) => {
+  return emotions.find(item => item.value === emotionType) || emotions[2]
+}
+
+const getUserId = () => {
+  try {
+    const stored = localStorage.getItem('cognia-user')
+    const parsed = stored ? JSON.parse(stored) : null
+    return Number(parsed?.id) || 1
+  } catch {
+    return 1
+  }
+}
+
+const formatDate = (value?: string, compact = false) => {
+  if (!value) return compact ? '--' : '未知时间'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return compact
+    ? `${date.getMonth() + 1}/${date.getDate()}`
+    : `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+const getLocalDateString = (date = new Date()) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
 </script>

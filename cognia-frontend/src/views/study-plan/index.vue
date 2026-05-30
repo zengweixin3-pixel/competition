@@ -1,736 +1,497 @@
 <template>
   <div class="space-y-6" v-loading="loading">
-    <!-- 页面标题 -->
-    <div class="flex items-center justify-between">
-      <div>
-        <h2 class="text-2xl font-bold text-text-primary">学习计划</h2>
-        <p class="text-text-muted mt-1">AI根据你的学习人格定制的专属计划</p>
-      </div>
-      <div class="flex gap-3">
-        <el-button size="large" @click="showGenerateDialog = true">
-          <el-icon class="mr-2"><MagicStick /></el-icon>AI生成计划
-        </el-button>
-        <el-button type="primary" size="large" @click="showCreateDialog = true">
-          <el-icon class="mr-2"><Plus /></el-icon>创建计划
-        </el-button>
-      </div>
+    <div class="flex items-center justify-end gap-3">
+      <el-button size="large" @click="showGenerateDialog = true">AI 生成计划</el-button>
+      <el-button size="large" type="primary" @click="showCreateDialog = true">新增计划</el-button>
     </div>
 
-    <!-- 今日计划概览 -->
-    <div class="card-gradient rounded-2xl p-6">
-      <div class="flex items-center justify-between mb-6">
-        <div>
-          <h3 class="font-bold text-text-primary text-lg">今日学习计划</h3>
-          <p class="text-sm text-text-muted">根据你的"理解驱动型"人格优化</p>
-        </div>
-        <div class="flex items-center gap-4">
-          <div class="text-right">
-            <div class="text-2xl font-bold text-text-primary">{{ todayProgress }}%</div>
-            <div class="text-xs text-text-muted">已完成</div>
-          </div>
-          <el-progress type="circle" :percentage="todayProgress" :width="60" :stroke-width="6" :color="['#6366f1', '#a855f7']" />
-        </div>
+    <section class="grid grid-cols-2 gap-6 xl:grid-cols-4">
+      <div class="card-gradient rounded-2xl p-6 text-center">
+        <p class="text-sm text-text-muted">今日总计划</p>
+        <p class="mt-3 text-3xl font-bold text-text-primary">{{ todayTotal }}</p>
       </div>
+      <div class="card-gradient rounded-2xl p-6 text-center">
+        <p class="text-sm text-text-muted">今日已完成</p>
+        <p class="mt-3 text-3xl font-bold text-text-primary">{{ todayCompleted }}</p>
+      </div>
+      <div class="card-gradient rounded-2xl p-6 text-center">
+        <p class="text-sm text-text-muted">完成率</p>
+        <p class="mt-3 text-3xl font-bold text-text-primary">{{ todayProgress }}%</p>
+      </div>
+      <div class="card-gradient rounded-2xl p-6 text-center">
+        <p class="text-sm text-text-muted">月累计完成</p>
+        <p class="mt-3 text-3xl font-bold text-text-primary">{{ reportCompletedTasks }}</p>
+      </div>
+    </section>
 
-      <div class="grid grid-cols-12 gap-4">
-        <div class="col-span-8 space-y-3">
+    <section class="grid grid-cols-1 gap-6 xl:grid-cols-3">
+      <div class="card-gradient rounded-2xl p-6 xl:col-span-2">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-lg font-bold text-text-primary">今日计划列表</h3>
+          </div>
+          <el-tag type="primary">{{ todayCompleted }}/{{ todayTotal }}</el-tag>
+        </div>
+        <div class="mt-5 space-y-3">
           <div
             v-for="task in todayTasks"
             :key="task.id"
-            class="flex items-center gap-4 p-4 bg-dark-bg/50 rounded-xl border-l-4"
-            :class="task.borderColor"
+            class="rounded-2xl bg-dark-bg/50 p-4"
           >
-            <el-checkbox v-model="task.completed" size="large" @change="updateProgress" />
-            <div class="flex-1">
-              <div class="flex items-center gap-3 mb-1">
-                <span class="font-medium" :class="task.completed ? 'line-through text-text-muted' : 'text-text-primary'">{{ task.name }}</span>
-                <el-tag size="small" :class="task.tagClass">{{ task.subject }}</el-tag>
-                <el-tag v-if="task.aiRecommended" size="small" effect="dark" class="bg-primary/30 border-primary/50">
-                  <el-icon class="mr-1"><Star /></el-icon>AI推荐
-                </el-tag>
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div class="min-w-0 flex-1">
+                <div class="flex flex-wrap items-center gap-2">
+                  <h4 class="truncate text-base font-bold text-text-primary">{{ task.name }}</h4>
+                  <el-tag size="small">{{ task.subject }}</el-tag>
+                </div>
+                <p class="mt-3 text-sm leading-6 text-text-secondary">{{ task.goal || '未填写目标' }}</p>
+                <div class="mt-3 flex flex-wrap gap-4 text-xs text-text-muted">
+                  <span>学习日期 {{ formatDate(task.studyDate) }}</span>
+                  <span>计划时长 {{ task.duration }} 分钟</span>
+                  <span>开始时间 {{ formatTime(task.startTime) }}</span>
+                </div>
               </div>
-              <div class="flex items-center gap-4 text-sm text-text-muted">
-                <span><el-icon class="mr-1"><Clock /></el-icon>{{ task.duration }}分钟</span>
-                <span><el-icon class="mr-1"><Aim /></el-icon>{{ task.goal }}</span>
-              </div>
-            </div>
-            <div class="flex items-center gap-2">
-              <el-button v-if="!task.completed" type="primary" size="small" plain @click="startTask(task)">开始</el-button>
-              <el-button size="small" @click="editTask(task)">编辑</el-button>
-            </div>
-          </div>
-        </div>
-        <div class="col-span-4">
-          <div class="bg-gradient-to-br from-primary/10 to-accent-purple/10 rounded-xl p-4 border border-primary/20 h-full">
-            <div class="flex items-center gap-2 mb-4">
-              <el-icon class="text-primary"><ChatDotRound /></el-icon>
-              <span class="font-medium text-text-primary">AI学习建议</span>
-            </div>
-            <div class="space-y-3 text-sm">
-              <div class="flex items-start gap-2">
-                <el-icon class="text-primary mt-0.5"><CircleCheck /></el-icon>
-                <span class="text-text-secondary">现在是你的高效时段，建议先完成高数定积分练习</span>
-              </div>
-              <div class="flex items-start gap-2">
-                <el-icon class="text-primary mt-0.5"><Clock /></el-icon>
-                <span class="text-text-secondary">每25分钟休息5分钟，保持最佳学习状态</span>
-              </div>
-              <div class="flex items-start gap-2">
-                <el-icon class="text-primary mt-0.5"><Warning /></el-icon>
-                <span class="text-text-secondary">注意：矩阵运算需要多检查，这是你的薄弱点</span>
-              </div>
-            </div>
-            <el-button type="primary" class="w-full mt-4" size="small" @click="ElMessage.info('专注模式功能开发中...')">
-              <el-icon class="mr-1"><VideoPlay /></el-icon>开始专注模式
-            </el-button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 周计划视图 -->
-    <div class="card-gradient rounded-2xl p-6">
-      <div class="flex items-center justify-between mb-6">
-        <div class="flex items-center gap-4">
-          <h3 class="font-bold text-text-primary text-lg">本周计划</h3>
-          <el-radio-group v-model="viewMode" size="small">
-            <el-radio-button label="日视图">日视图</el-radio-button>
-            <el-radio-button label="周视图">周视图</el-radio-button>
-            <el-radio-button label="月视图">月视图</el-radio-button>
-          </el-radio-group>
-        </div>
-        <div class="flex items-center gap-2">
-          <el-button size="small" :icon="ArrowLeft" circle @click="prevWeek" />
-          <span class="text-text-primary">{{ currentWeekRange }}</span>
-          <el-button size="small" :icon="ArrowRight" circle @click="nextWeek" />
-        </div>
-      </div>
-
-      <div class="grid grid-cols-7 gap-4">
-        <div
-          v-for="day in weekDays"
-          :key="day.date"
-          class="rounded-xl p-4 min-h-[200px]"
-          :class="day.isToday ? 'bg-primary/10 border border-primary/30' : 'bg-dark-bg/50'"
-        >
-          <div class="flex items-center justify-between mb-3">
-            <span class="text-sm" :class="day.isToday ? 'text-primary font-bold' : 'text-text-muted'">{{ day.name }}</span>
-            <span class="text-xs" :class="day.isToday ? 'text-primary' : 'text-text-muted'">{{ day.date }}</span>
-          </div>
-          <div class="space-y-2">
-            <div
-              v-for="task in day.tasks"
-              :key="task.id"
-              class="text-xs p-2 rounded-lg cursor-pointer transition-all"
-              :class="task.completed ? 'bg-emerald-500/20 text-emerald-400 line-through' : 'bg-dark-border text-text-secondary hover:bg-primary/20'"
-            >
-              <div class="flex items-center gap-1">
-                <span class="w-1.5 h-1.5 rounded-full" :class="task.color"></span>
-                <span class="truncate">{{ task.name }}</span>
+              <div class="flex items-center gap-3">
+                <el-switch
+                  :model-value="task.completed"
+                  active-text="已完成"
+                  inactive-text="待完成"
+                  @change="toggleTask(task, $event)"
+                />
               </div>
             </div>
           </div>
-          <div v-if="day.tasks.length === 0" class="text-xs text-text-muted text-center py-4">
-            暂无计划
-          </div>
+          <el-empty v-if="todayTasks.length === 0" description="今天还没有学习计划" />
         </div>
       </div>
-    </div>
 
-    <!-- 学习统计 -->
-    <div class="grid grid-cols-12 gap-6">
-      <div class="col-span-8 card-gradient rounded-2xl p-6">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="font-bold text-text-primary">计划完成情况趋势</h3>
-          <el-radio-group v-model="statsTimeRange" size="small">
-            <el-radio-button label="近7天">近7天</el-radio-button>
-            <el-radio-button label="近30天">近30天</el-radio-button>
-          </el-radio-group>
-        </div>
-        <div class="h-64">
-          <v-chart class="w-full h-full" :option="completionTrendOption" autoresize />
-        </div>
-      </div>
-      <div class="col-span-4 card-gradient rounded-2xl p-6">
-        <h3 class="font-bold text-text-primary mb-4">学科时间分配</h3>
-        <div class="h-64">
-          <v-chart class="w-full h-full" :option="subjectTimeOption" autoresize />
-        </div>
-      </div>
-    </div>
-
-    <!-- 计划模板 -->
-    <div class="card-gradient rounded-2xl p-6">
-      <div class="flex items-center justify-between mb-6">
-        <div>
-          <h3 class="font-bold text-text-primary text-lg">AI推荐计划模板</h3>
-          <p class="text-sm text-text-muted">基于你的学习人格定制</p>
-        </div>
-        <el-link type="primary" underline="never">查看更多 ></el-link>
-      </div>
-      <div class="grid grid-cols-3 gap-6">
-        <div
-          v-for="template in planTemplates"
-          :key="template.id"
-          class="bg-dark-bg/50 rounded-xl p-6 border border-transparent hover:border-primary/50 transition-all cursor-pointer group"
-        >
-          <div class="flex items-start justify-between mb-4">
-            <div class="w-12 h-12 rounded-xl flex items-center justify-center" :class="template.iconBg">
-              <el-icon :class="template.iconColor" class="text-2xl"><component :is="template.icon" /></el-icon>
-            </div>
-            <el-tag v-if="template.forDNA" size="small" effect="dark" class="bg-primary/30 border-primary/50">{{ template.forDNA }}</el-tag>
-          </div>
-          <h4 class="font-bold text-text-primary mb-2 group-hover:text-primary transition-colors">{{ template.name }}</h4>
-          <p class="text-sm text-text-secondary mb-4">{{ template.description }}</p>
-          <div class="flex items-center gap-4 text-xs text-text-muted">
-            <span><el-icon class="mr-1"><Clock /></el-icon>{{ template.duration }}</span>
-            <span><el-icon class="mr-1"><Document /></el-icon>{{ template.taskCount }}个任务</span>
-          </div>
-          <el-button type="primary" class="w-full mt-4" plain @click="ElMessage.success('已应用该模板')">使用此模板</el-button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 创建计划对话框 -->
-  <el-dialog v-model="showCreateDialog" title="创建学习计划" width="600px" destroy-on-close>
-    <div class="space-y-4">
-      <el-input v-model="newPlan.name" placeholder="计划名称" />
-      <el-select v-model="newPlan.subject" placeholder="选择学科" class="w-full">
-        <el-option label="高等数学" value="math" />
-        <el-option label="线性代数" value="linear" />
-        <el-option label="英语" value="english" />
-        <el-option label="专业课" value="major" />
-      </el-select>
-      <el-date-picker v-model="newPlan.date" type="date" placeholder="选择日期" class="w-full" />
-      <el-time-picker v-model="newPlan.startTime" placeholder="开始时间" class="w-full" />
-      <el-input-number v-model="newPlan.duration" :min="15" :max="180" :step="15" class="w-full" placeholder="持续时间（分钟）" />
-      <el-input v-model="newPlan.goal" type="textarea" :rows="3" placeholder="学习目标" />
-    </div>
-    <template #footer>
-      <el-button @click="showCreateDialog = false">取消</el-button>
-      <el-button type="primary" @click="createPlan">创建</el-button>
-    </template>
-  </el-dialog>
-
-  <!-- AI生成计划对话框 -->
-  <el-dialog v-model="showGenerateDialog" title="AI智能生成学习计划" width="600px" destroy-on-close>
-    <div class="space-y-4">
-      <div class="bg-primary/10 rounded-xl p-4 border border-primary/20">
-        <div class="flex items-start gap-3">
-          <el-icon class="text-primary text-xl"><ChatDotRound /></el-icon>
+      <div class="card-gradient rounded-2xl p-6">
+        <div class="flex items-center justify-between">
           <div>
-            <div class="font-medium text-text-primary mb-1">AI将根据以下信息为你生成计划</div>
-            <ul class="text-sm text-text-secondary space-y-1">
-              <li>• 你的学习人格类型：理解驱动型</li>
-              <li>• 近期错题分析结果</li>
-              <li>• 你的高效学习时段</li>
-              <li>• 当前学习目标和进度</li>
-            </ul>
+            <h3 class="text-lg font-bold text-text-primary">AI 计划建议</h3>
+            <p class="text-sm text-text-muted">结合你的学习节奏给出安排建议</p>
+          </div>
+        </div>
+        <div class="mt-5 space-y-4">
+          <div class="rounded-2xl bg-dark-bg/50 p-4">
+            <p class="text-xs text-text-muted">当前学习人格</p>
+            <p class="mt-2 text-sm font-medium text-text-primary">{{ userStore.learningDNA.type || '暂未分析' }}</p>
+          </div>
+          <div class="rounded-2xl bg-dark-bg/50 p-4">
+            <p class="text-xs text-text-muted">计划完成情况</p>
+            <p class="mt-2 text-sm font-medium text-text-primary">
+              今日 {{ todayCompleted }}/{{ todayTotal }}，月累计 {{ reportCompletedTasks }} 项
+            </p>
+          </div>
+          <div class="rounded-2xl border border-primary/20 bg-primary/10 p-4">
+            <p class="text-xs text-primary">建议</p>
+            <p class="mt-2 text-sm leading-6 text-text-primary">{{ suggestionText }}</p>
           </div>
         </div>
       </div>
-      <el-select v-model="generateParams.period" placeholder="计划周期" class="w-full">
-        <el-option label="今日计划" value="today" />
-        <el-option label="本周计划" value="week" />
-        <el-option label="本月计划" value="month" />
-      </el-select>
-      <el-select v-model="generateParams.focus" placeholder="学习重点" class="w-full">
-        <el-option label="薄弱科目强化" value="weak" />
-        <el-option label="全面复习" value="review" />
-        <el-option label="新课预习" value="preview" />
-        <el-option label="考前冲刺" value="exam" />
-      </el-select>
-      <el-input-number v-model="generateParams.dailyHours" :min="1" :max="12" class="w-full" placeholder="每日学习时长（小时）" />
-      <el-input v-model="generateParams.notes" type="textarea" :rows="3" placeholder="特殊需求或备注（可选）" />
-    </div>
-    <template #footer>
-      <el-button @click="showGenerateDialog = false">取消</el-button>
-      <el-button type="primary" :loading="isGenerating" @click="generatePlan">
-        <el-icon class="mr-1"><MagicStick /></el-icon>生成计划
-      </el-button>
-    </template>
-  </el-dialog>
+    </section>
 
-  <!-- 专注倒计时弹窗 -->
-  <el-dialog v-model="showTimer" :close-on-click-modal="false" width="480px" destroy-on-close>
-    <template #header>
-      <div class="flex items-center justify-between w-full">
-        <span class="text-lg font-bold text-text-primary">专注模式</span>
-        <el-button link @click="closeTimer">
-          <el-icon class="text-text-muted hover:text-text-primary"><Close /></el-icon>
-        </el-button>
+    <section class="card-gradient rounded-2xl p-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 class="text-lg font-bold text-text-primary">近 7 天计划趋势</h3>
+          <p class="text-sm text-text-muted">看看最近一周的完成节奏</p>
+        </div>
       </div>
-    </template>
-    <div class="text-center space-y-8">
-      <div class="text-text-primary font-medium text-lg">{{ activeTaskName }}</div>
-      <div class="flex justify-center">
-        <el-progress
-          type="circle"
-          :percentage="timerProgress"
-          :width="220"
-          :stroke-width="8"
-          :color="timerColor"
-        >
-          <template #default>
-            <div class="text-4xl font-bold text-text-primary font-mono">{{ formatTime(timeLeft) }}</div>
-            <div class="text-sm text-text-muted mt-2">{{ timerRunning ? '专注中...' : '已暂停' }}</div>
-          </template>
-        </el-progress>
+      <div class="mt-6 h-72">
+        <v-chart class="h-full w-full" :option="trendOption" autoresize />
       </div>
-      <div class="flex justify-center gap-3 flex-wrap">
-        <el-tag
-          v-for="d in [15, 25, 45, 60]"
-          :key="d"
-          :effect="timerDuration === d * 60 ? 'dark' : 'plain'"
-          class="cursor-pointer"
-          :class="timerDuration === d * 60 ? 'bg-primary/40 border-primary/60' : ''"
-          @click="setTimerDuration(d)"
-        >
-          {{ d }}分钟
-        </el-tag>
+    </section>
+
+    <section class="card-gradient rounded-2xl p-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 class="text-lg font-bold text-text-primary">本周计划排布</h3>
+          <p class="text-sm text-text-muted">一周任务分布一目了然</p>
+        </div>
       </div>
-      <div class="flex justify-center gap-4">
-        <el-button v-if="!timerRunning" type="primary" size="large" @click="startTimer">
-          <el-icon class="mr-2"><VideoPlay /></el-icon>{{ timeLeft < timerDuration ? '继续' : '开始' }}
-        </el-button>
-        <el-button v-else size="large" @click="pauseTimer">
-          <el-icon class="mr-2"><VideoPause /></el-icon>暂停
-        </el-button>
-        <el-button size="large" @click="resetTimer">
-          <el-icon class="mr-2"><Refresh /></el-icon>重置
-        </el-button>
+      <div class="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-7">
+        <div v-for="day in weekBuckets" :key="day.date" class="rounded-2xl bg-dark-bg/50 p-4">
+          <div class="flex items-center justify-between">
+            <p class="text-sm font-medium text-text-primary">{{ day.label }}</p>
+            <el-tag size="small">{{ day.tasks.length }}</el-tag>
+          </div>
+          <div class="mt-3 space-y-2">
+            <div v-for="task in day.tasks" :key="task.id" class="rounded-xl bg-dark-border px-3 py-2 text-xs text-text-secondary">
+              <p class="truncate">{{ task.name }}</p>
+            </div>
+            <p v-if="day.tasks.length === 0" class="text-xs text-text-muted">暂无计划</p>
+          </div>
+        </div>
       </div>
-      <el-button type="success" size="large" @click="completeTimer">
-        <el-icon class="mr-2"><CircleCheck /></el-icon>提前完成
-      </el-button>
-    </div>
-  </el-dialog>
+    </section>
+
+    <el-dialog v-model="showCreateDialog" title="新增学习计划" width="560px" destroy-on-close>
+      <div class="space-y-4">
+        <el-input v-model="form.name" placeholder="计划名称" />
+        <el-input v-model="form.goal" type="textarea" :rows="3" placeholder="计划目标" />
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <el-select v-model="form.subject" placeholder="选择学科">
+            <el-option label="高等数学" value="高等数学" />
+            <el-option label="线性代数" value="线性代数" />
+            <el-option label="英语" value="英语" />
+            <el-option label="专业课" value="专业课" />
+          </el-select>
+          <el-date-picker v-model="form.studyDate" type="date" class="w-full" placeholder="学习日期" value-format="YYYY-MM-DD" />
+          <el-time-picker v-model="form.startTime" class="w-full" placeholder="开始时间" value-format="HH:mm:ss" />
+          <el-input-number v-model="form.duration" :min="15" :step="15" class="w-full" />
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="showCreateDialog = false">取消</el-button>
+        <el-button type="primary" :loading="saving" @click="createTask">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="showGenerateDialog" title="AI 生成计划" width="560px" destroy-on-close>
+      <div class="space-y-4">
+        <el-select v-model="generateForm.focus" class="w-full" placeholder="学习重点">
+          <el-option label="薄弱学科强化" value="薄弱学科强化" />
+          <el-option label="综合复习" value="综合复习" />
+          <el-option label="考前冲刺" value="考前冲刺" />
+        </el-select>
+        <el-input-number v-model="generateForm.dailyHours" :min="1" :max="12" class="w-full" />
+        <el-date-picker v-model="generateForm.studyDate" type="date" class="w-full" placeholder="计划日期" value-format="YYYY-MM-DD" />
+        <el-input v-model="generateForm.notes" type="textarea" :rows="4" placeholder="补充需求" />
+      </div>
+      <template #footer>
+        <el-button @click="showGenerateDialog = false">取消</el-button>
+        <el-button type="primary" :loading="generating" @click="generatePlan">生成并保存</el-button>
+      </template>
+    </el-dialog>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { use } from 'echarts/core'
+import { BarChart } from 'echarts/charts'
+import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
-import { LineChart, PieChart } from 'echarts/charts'
-import { GridComponent, TooltipComponent, LegendComponent } from 'echarts/components'
 import VChart from 'vue-echarts'
-import {
-  Plus,
-  MagicStick,
-  Clock,
-  Aim,
-  Star,
-  ChatDotRound,
-  CircleCheck,
-  Warning,
-  VideoPlay,
-  ArrowLeft,
-  ArrowRight,
-  Document,
-  Reading,
-  Calendar,
-  Close,
-  VideoPause,
-  Refresh,
-} from '@element-plus/icons-vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { studyApi } from '@/api'
+import { ElMessage } from 'element-plus'
+import { aiApi, studyApi } from '@/api'
+import { useUserStore } from '@/stores/user'
 
-use([CanvasRenderer, LineChart, PieChart, GridComponent, TooltipComponent, LegendComponent])
+use([CanvasRenderer, BarChart, GridComponent, TooltipComponent, LegendComponent])
 
+type PlanTask = {
+  id: number
+  name: string
+  goal: string
+  subject: string
+  duration: number
+  studyDate: string
+  startTime?: string
+  endTime?: string
+  completed: boolean
+  raw: any
+}
+
+const userStore = useUserStore()
 const loading = ref(true)
-const viewMode = ref('周视图')
-const statsTimeRange = ref('近7天')
+const saving = ref(false)
+const generating = ref(false)
 const showCreateDialog = ref(false)
 const showGenerateDialog = ref(false)
-const isGenerating = ref(false)
-const currentWeekRange = ref('1月15日 - 1月21日')
+const reportCompletedTasks = ref(0)
+const todayTasks = ref<PlanTask[]>([])
+const allTasks = ref<PlanTask[]>([])
+const taskTrend = ref<Array<{ date: string; completed: number; pending: number }>>([])
 
-// 专注倒计时
-const showTimer = ref(false)
-const timerDuration = ref(25 * 60)
-const timeLeft = ref(25 * 60)
-const timerRunning = ref(false)
-const activeTaskName = ref('')
-const activeTaskId = ref<number | null>(null)
-let timerInterval: ReturnType<typeof setInterval> | null = null
-
-const timerProgress = computed(() => {
-  return Math.round(((timerDuration.value - timeLeft.value) / timerDuration.value) * 100)
-})
-const timerColor = computed(() => {
-  if (timeLeft.value < 60) return '#f43f5e'
-  if (timeLeft.value < 300) return '#f59e0b'
-  return '#6366f1'
+const form = ref({
+  name: '',
+  goal: '',
+  subject: '',
+  studyDate: getLocalDateString(),
+  startTime: '19:00:00',
+  duration: 45,
 })
 
-const formatTime = (seconds: number) => {
-  const m = Math.floor(seconds / 60)
-  const s = seconds % 60
-  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
-}
-
-const setTimerDuration = (minutes: number) => {
-  if (timerRunning.value) return
-  timerDuration.value = minutes * 60
-  timeLeft.value = minutes * 60
-}
-
-const startTimer = () => {
-  timerRunning.value = true
-  timerInterval = setInterval(() => {
-    timeLeft.value--
-    if (timeLeft.value <= 0) {
-      completeTimer()
-    }
-  }, 1000)
-}
-
-const pauseTimer = () => {
-  timerRunning.value = false
-  if (timerInterval) { clearInterval(timerInterval); timerInterval = null }
-}
-
-const resetTimer = () => {
-  pauseTimer()
-  timeLeft.value = timerDuration.value
-}
-
-const completeTimer = () => {
-  pauseTimer()
-  if (activeTaskId.value !== null) {
-    const task = todayTasks.value.find(t => t.id === activeTaskId.value)
-    if (task) task.completed = true
-  }
-  ElMessage.success('专注完成！任务已标记为完成')
-  showTimer.value = false
-}
-
-const closeTimer = () => {
-  if (timerRunning.value) {
-    ElMessageBox.confirm('专注计时仍在进行，确定要退出吗？', '确认退出', { type: 'warning' })
-      .then(() => { pauseTimer(); showTimer.value = false })
-      .catch(() => {})
-  } else {
-    showTimer.value = false
-  }
-}
-
-onMounted(async () => {
-  try {
-    const records = await studyApi.getRecords(1, 1, 50)
-    if (records && records.list) {
-      todayTasks.value = records.list
-        .filter((r: any) => !r.completed)
-        .slice(0, 6)
-        .map((r: any) => ({
-          id: r.id || Date.now(),
-          name: r.content || r.subject || '未命名任务',
-          subject: r.subject || '高等数学',
-          duration: r.duration || 45,
-          goal: '完成学习目标',
-          completed: false,
-          aiRecommended: false,
-          borderColor: 'border-primary',
-          tagClass: 'bg-primary/20 text-primary border-primary/50',
-        }))
-    }
-  } catch {
-    // 后端不可用
-  } finally {
-    loading.value = false
-  }
+const generateForm = ref({
+  focus: '薄弱学科强化',
+  dailyHours: 3,
+  studyDate: getLocalDateString(),
+  notes: '',
 })
 
-onUnmounted(() => {
-  if (timerInterval) clearInterval(timerInterval)
+const todayTotal = computed(() => todayTasks.value.length)
+const todayCompleted = computed(() => todayTasks.value.filter(item => item.completed).length)
+const todayProgress = computed(() => todayTotal.value ? Math.round((todayCompleted.value / todayTotal.value) * 100) : 0)
+
+const suggestionText = computed(() => {
+  if (!todayTotal.value) return '今天还没有安排学习计划，建议先创建 1-2 个可完成的小任务。'
+  if (todayCompleted.value === todayTotal.value) return '今天的计划已经全部完成，可以把剩余精力用来做错题复盘或总结。'
+  if (todayCompleted.value === 0) return '建议先完成一项最容易启动的任务，建立今天的学习节奏。'
+  return `今天还剩 ${todayTotal.value - todayCompleted.value} 项任务，优先处理耗时较长或与你的学习人格更匹配的内容。`
 })
 
-const todayTasks = ref([
-  {
-    id: 1,
-    name: '高数：定积分应用练习',
-    subject: '高等数学',
-    duration: 60,
-    goal: '完成5道定积分求面积题目',
-    completed: true,
-    aiRecommended: true,
-    borderColor: 'border-primary',
-    tagClass: 'bg-primary/20 text-primary border-primary/50',
-  },
-  {
-    id: 2,
-    name: '英语：阅读理解训练',
-    subject: '英语',
-    duration: 40,
-    goal: '完成2篇阅读理解，总结主旨',
-    completed: true,
-    aiRecommended: false,
-    borderColor: 'border-blue-500',
-    tagClass: 'bg-blue-500/20 text-blue-400 border-blue-500/50',
-  },
-  {
-    id: 3,
-    name: '线代：矩阵运算专项',
-    subject: '线性代数',
-    duration: 45,
-    goal: '复习矩阵乘法规则，做10道计算题',
-    completed: false,
-    aiRecommended: true,
-    borderColor: 'border-accent-purple',
-    tagClass: 'bg-accent-purple/20 text-accent-purple border-accent-purple/50',
-  },
-  {
-    id: 4,
-    name: '专业课：信号与系统',
-    subject: '专业课',
-    duration: 60,
-    goal: '学习傅里叶变换基础概念',
-    completed: false,
-    aiRecommended: false,
-    borderColor: 'border-emerald-500',
-    tagClass: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50',
-  },
-])
-
-const todayProgress = computed(() => {
-  const completed = todayTasks.value.filter(t => t.completed).length
-  return Math.round((completed / todayTasks.value.length) * 100)
-})
-
-const weekDays = ref([
-  { name: '周一', date: '1/15', isToday: false, tasks: [{ id: 1, name: '高数复习', completed: true, color: 'bg-primary' }] },
-  { name: '周二', date: '1/16', isToday: false, tasks: [{ id: 2, name: '英语阅读', completed: true, color: 'bg-blue-500' }] },
-  { name: '周三', date: '1/17', isToday: false, tasks: [{ id: 3, name: '线代练习', completed: false, color: 'bg-accent-purple' }] },
-  { name: '周四', date: '1/18', isToday: false, tasks: [] },
-  { name: '周五', date: '1/19', isToday: false, tasks: [{ id: 4, name: '专业课', completed: false, color: 'bg-emerald-500' }] },
-  { name: '周六', date: '1/20', isToday: false, tasks: [{ id: 5, name: '错题复习', completed: false, color: 'bg-amber-500' }] },
-  { name: '周日', date: '1/21', isToday: true, tasks: [{ id: 6, name: '高数练习', completed: true, color: 'bg-primary' }, { id: 7, name: '英语训练', completed: true, color: 'bg-blue-500' }, { id: 8, name: '线代专项', completed: false, color: 'bg-accent-purple' }] },
-])
-
-const completionTrendOption = {
-  grid: { top: 20, right: 20, bottom: 40, left: 50 },
-  tooltip: {
-    trigger: 'axis',
-    backgroundColor: 'rgba(17, 24, 39, 0.9)',
-    borderColor: '#374151',
-    textStyle: { color: '#f9fafb' },
-  },
+const trendOption = computed(() => ({
+  grid: { top: 20, right: 20, bottom: 24, left: 36 },
+  tooltip: { trigger: 'axis' },
   legend: {
-    data: ['计划完成率', '学习效率'],
-    bottom: 0,
+    data: ['已完成', '待完成'],
     textStyle: { color: '#9ca3af' },
   },
   xAxis: {
     type: 'category',
-    data: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
+    data: taskTrend.value.length ? taskTrend.value.map(item => item.date.slice(5)) : ['暂无数据'],
     axisLine: { lineStyle: { color: '#374151' } },
     axisLabel: { color: '#6b7280' },
   },
   yAxis: {
     type: 'value',
-    max: 100,
     axisLine: { show: false },
     splitLine: { lineStyle: { color: '#1f2937' } },
-    axisLabel: { color: '#6b7280', formatter: '{value}%' },
+    axisLabel: { color: '#6b7280' },
   },
   series: [
     {
-      name: '计划完成率',
-      type: 'line',
-      smooth: true,
-      data: [85, 90, 75, 80, 95, 70, 60],
-      lineStyle: { color: '#6366f1', width: 3 },
-      itemStyle: { color: '#6366f1' },
-      areaStyle: {
-        color: {
-          type: 'linear',
-          x: 0, y: 0, x2: 0, y2: 1,
-          colorStops: [
-            { offset: 0, color: 'rgba(99, 102, 241, 0.4)' },
-            { offset: 1, color: 'rgba(99, 102, 241, 0)' },
-          ],
-        },
-      },
+      name: '已完成',
+      type: 'bar',
+      data: taskTrend.value.length ? taskTrend.value.map(item => item.completed) : [0],
+      itemStyle: { color: '#10b981', borderRadius: [6, 6, 0, 0] },
     },
     {
-      name: '学习效率',
-      type: 'line',
-      smooth: true,
-      data: [80, 85, 70, 75, 90, 65, 55],
-      lineStyle: { color: '#10b981', width: 3 },
-      itemStyle: { color: '#10b981' },
+      name: '待完成',
+      type: 'bar',
+      data: taskTrend.value.length ? taskTrend.value.map(item => item.pending) : [0],
+      itemStyle: { color: '#f59e0b', borderRadius: [6, 6, 0, 0] },
     },
   ],
-}
+}))
 
-const subjectTimeOption = {
-  tooltip: {
-    trigger: 'item',
-    backgroundColor: 'rgba(17, 24, 39, 0.9)',
-    borderColor: '#374151',
-    textStyle: { color: '#f9fafb' },
-  },
-  legend: {
-    orient: 'vertical',
-    right: 10,
-    top: 'center',
-    textStyle: { color: '#9ca3af' },
-  },
-  series: [{
-    type: 'pie',
-    radius: ['40%', '70%'],
-    center: ['35%', '50%'],
-    avoidLabelOverlap: false,
-    itemStyle: {
-      borderRadius: 8,
-      borderColor: '#0a0e1a',
-      borderWidth: 2,
-    },
-    label: { show: false },
-    data: [
-      { value: 35, name: '高等数学', itemStyle: { color: '#6366f1' } },
-      { value: 25, name: '专业课', itemStyle: { color: '#10b981' } },
-      { value: 20, name: '英语', itemStyle: { color: '#3b82f6' } },
-      { value: 15, name: '线性代数', itemStyle: { color: '#a855f7' } },
-      { value: 5, name: '其他', itemStyle: { color: '#6b7280' } },
-    ],
-  }],
-}
-
-const planTemplates = ref([
-  {
-    id: 1,
-    name: '理解驱动型专属计划',
-    description: '针对理解驱动型学习者设计，强调概念理解后再练习，适合深度学习',
-    icon: 'Reading',
-    iconBg: 'bg-primary/20',
-    iconColor: 'text-primary',
-    forDNA: '理解驱动型',
-    duration: '每日4小时',
-    taskCount: 6,
-  },
-  {
-    id: 2,
-    name: '考前冲刺计划',
-    description: '针对考试周的密集复习计划，重点突破薄弱环节',
-    icon: 'Calendar',
-    iconBg: 'bg-rose-500/20',
-    iconColor: 'text-rose-400',
-    forDNA: '',
-    duration: '每日6小时',
-    taskCount: 8,
-  },
-  {
-    id: 3,
-    name: '错题攻克计划',
-    description: '基于你的错题本智能生成，针对性强化薄弱知识点',
-    icon: 'Document',
-    iconBg: 'bg-accent-purple/20',
-    iconColor: 'text-accent-purple',
-    forDNA: '',
-    duration: '每日3小时',
-    taskCount: 5,
-  },
-])
-
-const newPlan = ref({
-  name: '',
-  subject: '',
-  date: '',
-  startTime: '',
-  duration: 45,
-  goal: '',
+const weekBuckets = computed(() => {
+  const start = startOfWeek(new Date())
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(start)
+    date.setDate(start.getDate() + index)
+    const dateText = getLocalDateString(date)
+    return {
+      date: dateText,
+      label: `${date.getMonth() + 1}/${date.getDate()}`,
+      tasks: allTasks.value.filter(item => item.studyDate === dateText),
+    }
+  })
 })
 
-const generateParams = ref({
-  period: 'today',
-  focus: 'weak',
-  dailyHours: 4,
-  notes: '',
+onMounted(async () => {
+  await Promise.all([userStore.loadDNA(), reload()])
+  loading.value = false
 })
 
-const updateProgress = () => {
-  const completed = todayTasks.value.filter(t => t.completed).length
-  if (completed === todayTasks.value.length) {
-    ElMessage.success('今日所有任务已完成，太棒了！')
-  }
+const reload = async () => {
+  const userId = getUserId()
+  const [statsResult, recordsResult] = await Promise.all([
+    studyApi.getStats(userId),
+    studyApi.getRecords(userId, 1, 200),
+  ])
+
+  reportCompletedTasks.value = Number(statsResult.reportCompletedTasks) || 0
+  taskTrend.value = Array.isArray(statsResult.taskTrend)
+    ? statsResult.taskTrend.map((item: any) => ({
+        date: String(item.date || ''),
+        completed: Number(item.completed) || 0,
+        pending: Number(item.pending) || 0,
+      }))
+    : []
+
+  allTasks.value = Array.isArray(recordsResult.list)
+    ? recordsResult.list.map((record: any) => mapRecordToTask(record))
+    : []
+
+  todayTasks.value = allTasks.value.filter(item => item.studyDate === getLocalDateString())
 }
 
-const startTask = (task: any) => {
-  activeTaskName.value = task.name
-  activeTaskId.value = task.id
-  timerDuration.value = task.duration * 60
-  timeLeft.value = task.duration * 60
-  timerRunning.value = false
-  showTimer.value = true
-}
-
-const editTask = (task: any) => {
-  newPlan.value = {
-    name: task.name,
-    subject: '',
-    date: '',
-    startTime: '',
-    duration: task.duration,
-    goal: task.goal,
-  }
-  showCreateDialog.value = true
-}
-
-const prevWeek = () => {
-  ElMessage.info('切换到上一周视图（演示模式）')
-}
-const nextWeek = () => {
-  ElMessage.info('切换到下一周视图（演示模式）')
-}
-
-const createPlan = () => {
-  if (!newPlan.value.name.trim() || !newPlan.value.subject) {
-    ElMessage.warning('请填写计划名称和学科')
+const createTask = async () => {
+  if (!form.value.name.trim() || !form.value.subject || !form.value.studyDate) {
+    ElMessage.warning('请填写完整的计划信息')
     return
   }
-  const subjectMap: Record<string, string> = {
-    'math': '高等数学',
-    'linear': '线性代数',
-    'english': '英语',
-    'major': '专业课',
+  saving.value = true
+  try {
+    await studyApi.addRecord(buildStudyRecordPayload({
+      name: form.value.name.trim(),
+      goal: form.value.goal.trim(),
+      subject: form.value.subject,
+      duration: form.value.duration,
+      studyDate: form.value.studyDate,
+      startTime: form.value.startTime,
+    }))
+    showCreateDialog.value = false
+    form.value = {
+      name: '',
+      goal: '',
+      subject: '',
+      studyDate: getLocalDateString(),
+      startTime: '19:00:00',
+      duration: 45,
+    }
+    await reload()
+    ElMessage.success('学习计划已保存')
+  } catch {
+    ElMessage.error('学习计划保存失败，请稍后重试')
+  } finally {
+    saving.value = false
   }
-  const borderColorMap: Record<string, string> = {
-    'math': 'border-primary',
-    'linear': 'border-accent-purple',
-    'english': 'border-blue-500',
-    'major': 'border-emerald-500',
-  }
-  const tagClassMap: Record<string, string> = {
-    'math': 'bg-primary/20 text-primary border-primary/50',
-    'linear': 'bg-accent-purple/20 text-accent-purple border-accent-purple/50',
-    'english': 'bg-blue-500/20 text-blue-400 border-blue-500/50',
-    'major': 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50',
-  }
-  const newTask = {
-    id: Date.now(),
-    name: newPlan.value.name,
-    subject: subjectMap[newPlan.value.subject] || newPlan.value.subject,
-    duration: newPlan.value.duration,
-    goal: newPlan.value.goal || '完成学习目标',
-    completed: false,
-    aiRecommended: false,
-    borderColor: borderColorMap[newPlan.value.subject] || 'border-primary',
-    tagClass: tagClassMap[newPlan.value.subject] || 'bg-primary/20 text-primary border-primary/50',
-  }
-  todayTasks.value.push(newTask)
-  showCreateDialog.value = false
-  newPlan.value = { name: '', subject: '', date: '', startTime: '', duration: 45, goal: '' }
-  ElMessage.success('学习计划已创建')
 }
 
-const generatePlan = () => {
-  isGenerating.value = true
-  setTimeout(() => {
-    isGenerating.value = false
+const toggleTask = async (task: PlanTask, completed: boolean | string | number) => {
+  const isCompleted = Boolean(completed)
+  try {
+    await studyApi.updateRecord({
+      id: task.id,
+      subject: task.subject,
+      duration: task.duration,
+      content: JSON.stringify({ name: task.name, goal: task.goal }),
+      studyDate: task.studyDate,
+      startTime: task.raw.startTime,
+      endTime: isCompleted ? new Date().toISOString().slice(0, 19) : null,
+      focusLevel: task.raw.focusLevel,
+      score: task.raw.score,
+    })
+    await reload()
+    ElMessage.success(isCompleted ? '任务已标记为完成' : '任务已恢复为待完成')
+  } catch {
+    ElMessage.error('任务状态更新失败，请稍后重试')
+  }
+}
+
+const generatePlan = async () => {
+  generating.value = true
+  try {
+    const dna = userStore.learningDNA.type
+      ? `${userStore.learningDNA.type} ${userStore.learningDNA.radarData.map(item => `${item.name}${item.value}`).join(' ')}`
+      : '常规学习计划'
+    const result = await aiApi.generatePlan({
+      userDNA: dna,
+      focus: generateForm.value.focus,
+      dailyHours: generateForm.value.dailyHours,
+      notes: generateForm.value.notes,
+    })
+    const tasks = parseGeneratedPlan(result.plan)
+    if (!tasks.length) {
+      ElMessage.warning('AI 返回内容无法解析成计划，请调整条件后重试')
+      return
+    }
+    for (const task of tasks) {
+      await studyApi.addRecord(buildStudyRecordPayload({
+        ...task,
+        studyDate: generateForm.value.studyDate,
+        startTime: '19:00:00',
+      }))
+    }
     showGenerateDialog.value = false
-  }, 2000)
+    await reload()
+    ElMessage.success('AI 计划已生成并保存')
+  } catch {
+    ElMessage.error('AI 计划生成失败，请稍后重试')
+  } finally {
+    generating.value = false
+  }
+}
+
+const buildStudyRecordPayload = (task: {
+  name: string
+  goal: string
+  subject: string
+  duration: number
+  studyDate: string
+  startTime?: string
+}) => {
+  const datePart = task.studyDate
+  const timePart = task.startTime || '19:00:00'
+  return {
+    subject: task.subject,
+    duration: task.duration,
+    content: JSON.stringify({ name: task.name, goal: task.goal }),
+    studyDate: datePart,
+    startTime: `${datePart}T${timePart}`,
+    endTime: null,
+  }
+}
+
+const mapRecordToTask = (record: any): PlanTask => {
+  const parsed = parseContent(record.content)
+  return {
+    id: Number(record.id) || Date.now(),
+    name: parsed.name,
+    goal: parsed.goal,
+    subject: record.subject || '未分类',
+    duration: Number(record.duration) || 0,
+    studyDate: (record.studyDate || '').slice(0, 10),
+    startTime: record.startTime || '',
+    endTime: record.endTime || '',
+    completed: Boolean(record.endTime),
+    raw: record,
+  }
+}
+
+const parseContent = (content?: string) => {
+  if (!content) return { name: '学习任务', goal: '' }
+  try {
+    const parsed = JSON.parse(content)
+    return {
+      name: parsed.name || parsed.goal || '学习任务',
+      goal: parsed.goal || '',
+    }
+  } catch {
+    return { name: content, goal: '' }
+  }
+}
+
+const parseGeneratedPlan = (planText: string) => {
+  return planText
+    .split('\n')
+    .map(line => line.replace(/^[\d\-\*\.\s]+/, '').trim())
+    .filter(line => line.length >= 4)
+    .slice(0, 5)
+    .map((line, index) => ({
+      name: line.slice(0, 20),
+      goal: line,
+      subject: ['高等数学', '线性代数', '英语', '专业课'][index % 4],
+      duration: Math.max(30, generateForm.value.dailyHours * 15),
+    }))
+}
+
+const getUserId = () => {
+  try {
+    const stored = localStorage.getItem('cognia-user')
+    const parsed = stored ? JSON.parse(stored) : null
+    return Number(parsed?.id) || 1
+  } catch {
+    return 1
+  }
+}
+
+const formatDate = (value?: string) => {
+  if (!value) return '未设置'
+  return value.slice(0, 10)
+}
+
+const formatTime = (value?: string) => {
+  if (!value) return '未设置'
+  if (value.includes('T')) return value.split('T')[1].slice(0, 5)
+  return value.slice(11, 16) || value.slice(0, 5)
+}
+
+const startOfWeek = (date: Date) => {
+  const current = new Date(date)
+  const day = current.getDay() || 7
+  current.setDate(current.getDate() - day + 1)
+  current.setHours(0, 0, 0, 0)
+  return current
+}
+
+function getLocalDateString(date = new Date()) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 </script>

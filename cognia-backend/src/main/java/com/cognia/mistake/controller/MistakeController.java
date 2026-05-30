@@ -1,13 +1,20 @@
 package com.cognia.mistake.controller;
 
-import com.cognia.common.Result;
 import com.cognia.common.PageResult;
+import com.cognia.common.Result;
 import com.cognia.mistake.entity.Mistake;
 import com.cognia.mistake.service.MistakeService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -50,8 +57,21 @@ public class MistakeController {
         return Result.success(mistakeService.getMistakeStats(userId));
     }
 
+    @GetMapping("/detail/{id}")
+    public Result<Mistake> getMistakeDetail(@PathVariable Long id) {
+        Mistake mistake = mistakeService.getMistakeDetail(id);
+        if (mistake == null) {
+            return Result.error(404, "错题不存在");
+        }
+        return Result.success(mistake);
+    }
+
     @PostMapping("/analyze/{id}")
-    public Result<String> analyzeMistake(@PathVariable Long id, @RequestParam String userDNA) {
-        return Result.success(mistakeService.analyzeMistake(id, userDNA));
+    public Result<Map<String, Object>> analyzeMistake(@PathVariable Long id, @RequestParam String userDNA) {
+        Map<String, Object> result = mistakeService.submitMistakeAnalysis(id, userDNA);
+        if (result == null) {
+            return Result.error(404, "错题不存在");
+        }
+        return Result.success(result);
     }
 }

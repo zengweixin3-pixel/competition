@@ -1,13 +1,18 @@
 package com.cognia.ai.service;
 
 import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
 import lombok.extern.slf4j.Slf4j;
-import okhttp3.*;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+import okhttp3.ResponseBody;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -17,6 +22,9 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 @Service
 public class AIService {
+
+    public static final String MISTAKE_ANALYSIS_FAILURE = "[AI服务异常] 错题分析暂时不可用，请稍后重试。";
+    private static final String COMMON_AI_FAILURE = "AI服务暂时不可用，请稍后重试。";
 
     @Value("${ai.bailian.api-key}")
     private String apiKey;
@@ -33,17 +41,197 @@ public class AIService {
             .writeTimeout(60, TimeUnit.SECONDS)
             .build();
 
+    public enum Agent {
+        COACH(
+                "学习教练",
+                "你是 Cognia 的 AI 学习教练。你的回答要专业、清晰、鼓励式，"
+                        + "优先帮助学生理解知识、拆解问题、建立可执行的学习步骤。"
+        ),
+        ANALYST(
+                "错题分析师",
+                "你是 Cognia 的错题分析师。你的任务是从错题中定位真实原因，"
+                        + "找出概念、方法、审题、计算或习惯层面的根因，并给出具体改进建议。"
+        ),
+        COMPANION(
+                "情绪伙伴",
+                "你是 Cognia 的情绪伙伴。你的回答要温和、真诚、有边界感，"
+                        + "先理解学生的情绪，再给出能马上执行的小建议。"
+        ),
+        PLANNER(
+                "学习规划师",
+                "你是 Cognia 的学习规划师。你的任务是把学生的学习目标拆成清晰可执行的安排，"
+                        + "保证计划现实、具体、可落地，并兼顾休息与复盘。"
+        );
+
+        public final String displayName;
+        public final String systemPrompt;
+
+        Agent(String displayName, String systemPrompt) {
+            this.displayName = displayName;
+            this.systemPrompt = systemPrompt;
+        }
+    }
+
     public String chat(String userMessage, String userDNA, String emotion, String context) {
+        return chat(Agent.COACH, userMessage, userDNA, emotion, context);
+    }
+
+    public String chat(Agent agent, String userMessage, String userDNA, String emotion, String context) {
+        String systemPrompt = buildAgentPrompt(agent, userDNA, emotion);
+        return callAI("chat-" + agent.name().toLowerCase(), systemPrompt, context, safeText(userMessage, "请给我一个学习建议。"));
+    }
+
+    public String analyzeMistake(String mistakeContent, String subject, String userDNA) {
+        if (isBlank(mistakeContent)) {
+            return MISTAKE_ANALYSIS_FAILURE;
+        }
+
+        StringBuilder taskPrompt = new StringBuilder();
+        taskPrompt.append("请分析下面这道错题，并严格按四个小节输出。\n\n");
+        taskPrompt.append("学科：").append(safeText(subject, "未分类")).append("\n");
+        taskPrompt.append("错题内容：").append(mistakeContent.trim()).append("\n\n");
+        taskPrompt.append("输出要求：\n");
+        taskPrompt.append("1. 必须包含“错误原因 / 根本问题 / 改进建议 / 推荐资源”四个标题。\n");
+        taskPrompt.append("2. 每个标题下给出具体内容，不要只写一句空话。\n");
+        taskPrompt.append("3. 改进建议至少写 3 条，尽量能直接执行。\n");
+        taskPrompt.append("4. 推荐资源优先给教材章节、练习方向、复盘方法，不要编造外部链接。\n");
+
+        String systemPrompt = buildAgentPrompt(Agent.ANALYST, userDNA, "专注");
+        String response = callAI("mistake-analysis", systemPrompt, null, taskPrompt.toString());
+        if (isFailureText(response)) {
+            return MISTAKE_ANALYSIS_FAILURE;
+        }
+        return normalizeMistakeAnalysis(response);
+    }
+
+    public String analyzeEmotion(String emotionType, String content, String userDNA) {
+        StringBuilder taskPrompt = new StringBuilder();
+        taskPrompt.append("学生当前情绪：").append(safeText(emotionType, "普通")).append("\n");
+        taskPrompt.append("学生描述：").append(safeText(content, "暂时没有额外补充。")).append("\n\n");
+        taskPrompt.append("请先共情，再给出 2 到 3 条可以马上执行的建议，语气要温和、简洁。");
+
+        String systemPrompt = buildAgentPrompt(Agent.COMPANION, userDNA, emotionType);
+        String response = callAI("emotion-analysis", systemPrompt, null, taskPrompt.toString());
+        if (isFailureText(response)) {
+            return "我暂时没能连接到 AI 服务，但你的情绪已经保存成功。建议先休息 5 分钟，再继续当前学习任务。";
+        }
+        return response;
+    }
+
+    public String generateLearningPlan(String userDNA, String focus, Double dailyHours, String notes) {
+        double resolvedHours = dailyHours == null ? 2.0 : dailyHours;
+
+        StringBuilder taskPrompt = new StringBuilder();
+        taskPrompt.append("请为学生生成一份学习计划。\n\n");
+        taskPrompt.append("学习重点：").append(safeText(focus, "综合复习")).append("\n");
+        taskPrompt.append("每日可用时间：").append(resolvedHours).append(" 小时\n");
+        taskPrompt.append("补充说明：").append(safeText(notes, "无")).append("\n\n");
+        taskPrompt.append("请输出：\n");
+        taskPrompt.append("1. 今日安排\n");
+        taskPrompt.append("2. 任务拆解\n");
+        taskPrompt.append("3. 复盘建议\n");
+        taskPrompt.append("4. 休息提醒\n");
+
+        String systemPrompt = buildAgentPrompt(Agent.PLANNER, userDNA, "专注");
+        String response = callAI("generate-plan", systemPrompt, null, taskPrompt.toString());
+        if (isFailureText(response)) {
+            return "AI服务暂时不可用，请先按“主任务 1 个 + 巩固任务 1 个 + 复盘 1 次”的节奏安排今天的学习。";
+        }
+        return response;
+    }
+
+    public static boolean isFailureText(String text) {
+        if (text == null) {
+            return true;
+        }
+        String value = text.trim();
+        return value.isEmpty()
+                || COMMON_AI_FAILURE.equals(value)
+                || value.startsWith("[AI服务异常]");
+    }
+
+    private String buildAgentPrompt(Agent agent, String userDNA, String emotion) {
+        StringBuilder prompt = new StringBuilder();
+        prompt.append(agent.systemPrompt).append("\n\n");
+        prompt.append("请始终使用简体中文回答，避免空泛套话，优先给出贴近学习场景的内容。\n");
+
+        if (!isBlank(userDNA)) {
+            prompt.append("\n【学生学习画像】\n");
+            prompt.append(userDNA.trim()).append("\n");
+            appendDnaHints(prompt, userDNA);
+        }
+
+        if (!isBlank(emotion) && !"专注".equals(emotion)) {
+            prompt.append("\n【当前情绪】\n");
+            prompt.append(emotion.trim()).append("\n");
+        }
+
+        prompt.append("\n【回答原则】\n");
+        switch (agent) {
+            case COACH:
+                prompt.append("1. 先解释，再给步骤。\n");
+                prompt.append("2. 多用短句、分点、类比，帮助学生真正听懂。\n");
+                prompt.append("3. 如果问题复杂，拆成更小的学习动作。\n");
+                break;
+            case ANALYST:
+                prompt.append("1. 先指出错在哪里，再分析为什么会错。\n");
+                prompt.append("2. 不要只说“粗心”或“多练”，要给出可执行的改进动作。\n");
+                prompt.append("3. 输出必须足够具体，便于学生直接复盘。\n");
+                break;
+            case COMPANION:
+                prompt.append("1. 先共情，不要机械安慰。\n");
+                prompt.append("2. 建议要轻量、温和、能马上执行。\n");
+                prompt.append("3. 避免说教式表达。\n");
+                break;
+            case PLANNER:
+                prompt.append("1. 计划必须可执行，避免过满。\n");
+                prompt.append("2. 要兼顾主任务、巩固、复盘和休息。\n");
+                prompt.append("3. 输出尽量结构化。\n");
+                break;
+            default:
+                break;
+        }
+
+        return prompt.toString();
+    }
+
+    private void appendDnaHints(StringBuilder prompt, String userDNA) {
+        String dna = userDNA == null ? "" : userDNA;
+        if (dna.contains("理解驱动")) {
+            prompt.append("- 学生偏向先理解原理，再开始练题。\n");
+        }
+        if (dna.contains("记忆强化")) {
+            prompt.append("- 可以结合归纳总结、卡片记忆和重复回顾。\n");
+        }
+        if (dna.contains("专注深潜")) {
+            prompt.append("- 适合整块时间完成高专注任务。\n");
+        }
+        if (dna.contains("执行先锋")) {
+            prompt.append("- 适合明确里程碑和打勾式任务管理。\n");
+        }
+        if (dna.contains("从容稳进")) {
+            prompt.append("- 需要兼顾节奏稳定和情绪状态。\n");
+        }
+        if (dna.contains("逻辑推理")) {
+            prompt.append("- 适合强调推导过程、因果链和公式来源。\n");
+        }
+    }
+
+    private String callAI(String scene, String systemPrompt, String context, String userMessage) {
+        if (isBlank(apiKey) || isBlank(baseUrl) || isBlank(model)) {
+            log.error("AI configuration missing, scene={}, baseUrl={}, modelPresent={}", scene, baseUrl, !isBlank(model));
+            return COMMON_AI_FAILURE;
+        }
+
         try {
-            String systemPrompt = buildSystemPrompt(userDNA, emotion);
-            List<Map<String, String>> messages = new ArrayList<>();
+            List<Map<String, String>> messages = new ArrayList<Map<String, String>>();
             messages.add(createMessage("system", systemPrompt));
-            if (context != null && !context.isEmpty()) {
-                messages.add(createMessage("system", "对话上下文：" + context));
+            if (!isBlank(context)) {
+                messages.add(createMessage("system", "补充上下文：\n" + context.trim()));
             }
             messages.add(createMessage("user", userMessage));
 
-            Map<String, Object> requestBody = new HashMap<>();
+            Map<String, Object> requestBody = new HashMap<String, Object>();
             requestBody.put("model", model);
             requestBody.put("messages", messages);
             requestBody.put("temperature", 0.7);
@@ -62,145 +250,89 @@ public class AIService {
                     .build();
 
             try (Response response = client.newCall(request).execute()) {
+                ResponseBody responseBody = response.body();
+                String bodyText = responseBody != null ? responseBody.string() : "";
+
                 if (!response.isSuccessful()) {
-                    log.error("AI API调用失败: {}", response.body().string());
-                    return "抱歉，AI服务暂时不可用，请稍后再试。";
+                    log.error("AI request failed, scene={}, code={}, body={}", scene, response.code(), bodyText);
+                    return COMMON_AI_FAILURE;
                 }
-                String responseBody = response.body().string();
-                JSONObject json = JSON.parseObject(responseBody);
-                return json.getJSONArray("choices")
-                        .getJSONObject(0)
-                        .getJSONObject("message")
-                        .getString("content");
+
+                String content = extractContent(bodyText);
+                if (isBlank(content)) {
+                    log.error("AI response empty, scene={}, body={}", scene, bodyText);
+                    return COMMON_AI_FAILURE;
+                }
+                return content.trim();
             }
-        } catch (IOException e) {
-            log.error("AI服务调用异常", e);
-            return "抱歉，服务出现错误，请稍后再试。";
+        } catch (Exception e) {
+            log.error("AI request exception, scene={}", scene, e);
+            return COMMON_AI_FAILURE;
         }
     }
 
-    public String analyzeMistake(String mistakeContent, String subject, String userDNA) {
-        String prompt = String.format(
-            "你是一位专业的学习分析师。请分析以下错题，并给出详细的错因分析和改进建议。\n\n" +
-            "学生信息：\n" +
-            "- 学习人格类型：%s\n" +
-            "- 学科：%s\n\n" +
-            "错题内容：\n" +
-            "%s\n\n" +
-            "请按以下格式输出分析结果（使用中文）：\n\n" +
-            "【错误原因】\n" +
-            "（简明扼要地指出错误原因）\n\n" +
-            "【根本问题】\n" +
-            "（深入分析导致错误的根本原因）\n\n" +
-            "【改进建议】\n" +
-            "1. ...\n" +
-            "2. ...\n" +
-            "3. ...\n\n" +
-            "【推荐资源】\n" +
-            "- 相关知识点视频/文档推荐\n" +
-            "- 练习题目推荐\n",
-            userDNA, subject, mistakeContent
-        );
-
-        return chat(prompt, userDNA, "专注", null);
-    }
-
-    public String analyzeEmotion(String emotionType, String content, String userDNA) {
-        String prompt = String.format(
-            "你是一位贴心的学习陪伴AI。学生现在的心情是：%s\n\n" +
-            "学生描述：%s\n" +
-            "学习人格类型：%s\n\n" +
-            "请根据学生的情绪状态，给出温暖的回应和适当的建议。\n" +
-            "回应要体现AI的温度感，让学生感到被理解和支持。\n",
-            emotionType, content, userDNA
-        );
-
-        return chat(prompt, userDNA, emotionType, null);
-    }
-
-    public String generateLearningPlan(String userDNA, String focus, Double dailyHours, String notes) {
-        String prompt = String.format(
-            "你是一位专业的学习规划师。请为以下学生生成个性化的学习计划。\n\n" +
-            "学生信息：\n" +
-            "- 学习人格类型：%s\n" +
-            "- 学习重点：%s\n" +
-            "- 每日可用时间：%.1f小时\n" +
-            "- 特殊需求：%s\n\n" +
-            "请生成一份详细的学习计划，包括：\n" +
-            "1. 每日学习安排（考虑学生的人格特点）\n" +
-            "2. 具体的学习任务和目标\n" +
-            "3. 学习方法和技巧建议\n" +
-            "4. 休息和调节建议\n",
-            userDNA, focus, dailyHours, notes
-        );
-
-        return chat(prompt, userDNA, "专注", null);
-    }
-
-    private String buildSystemPrompt(String userDNA, String emotion) {
-        StringBuilder prompt = new StringBuilder();
-        prompt.append("你是一位专业的AI学习教练，名叫Cognia。你的任务是帮助学生更好地学习。\n\n");
-
-        if (userDNA != null && !userDNA.isEmpty()) {
-            prompt.append("【学生人格特征】\n");
-            switch (userDNA) {
-                case "理解驱动型":
-                    prompt.append("- 擅长深入理解知识，喜欢探索原理\n");
-                    prompt.append("- 适合使用图像化、类比的方式讲解\n");
-                    prompt.append("- 建议先理解概念再做题\n");
-                    prompt.append("- 使用简短句子，避免冗长说明\n");
-                    break;
-                case "视觉记忆型":
-                    prompt.append("- 对图像、图表记忆深刻\n");
-                    prompt.append("- 多用视觉化方式呈现知识\n");
-                    prompt.append("- 建议使用思维导图、流程图\n");
-                    break;
-                case "冲刺爆发型":
-                    prompt.append("- 适合短时高效学习\n");
-                    prompt.append("- 注意力集中但持续时间短\n");
-                    prompt.append("- 建议使用番茄工作法\n");
-                    break;
-                default:
-                    prompt.append("- 采用个性化教学方式\n");
-                    prompt.append("- 关注学生的学习反馈\n");
-            }
-            prompt.append("\n");
+    private String extractContent(String bodyText) {
+        JSONObject json = JSON.parseObject(bodyText);
+        if (json == null) {
+            return null;
         }
 
-        if (emotion != null && !emotion.isEmpty() && !"专注".equals(emotion)) {
-            prompt.append("【当前情绪状态】\n");
-            prompt.append("学生当前情绪：").append(emotion).append("\n");
-            switch (emotion) {
-                case "焦虑":
-                case "有点累":
-                    prompt.append("- 请使用鼓励、温和的语气\n");
-                    prompt.append("- 建议降低学习难度，缩短任务时长\n");
-                    prompt.append("- 多给予正面反馈\n");
-                    break;
-                case "烦躁":
-                    prompt.append("- 请耐心倾听，表示理解\n");
-                    prompt.append("- 建议暂停学习，适当休息\n");
-                    break;
-                default:
-                    prompt.append("- 保持友好、支持的语气\n");
-            }
-            prompt.append("\n");
+        JSONArray choices = json.getJSONArray("choices");
+        if (choices == null || choices.isEmpty()) {
+            return null;
         }
 
-        prompt.append("【回复原则】\n");
-        prompt.append("1. 使用简短、清晰的句子\n");
-        prompt.append("2. 适当使用图像类比帮助理解\n");
-        prompt.append("3. 给予鼓励和支持\n");
-        prompt.append("4. 根据学生人格调整讲解方式\n");
-        prompt.append("5. 保持专业性和温度感\n");
+        JSONObject firstChoice = choices.getJSONObject(0);
+        if (firstChoice == null) {
+            return null;
+        }
 
-        return prompt.toString();
+        JSONObject message = firstChoice.getJSONObject("message");
+        if (message == null) {
+            return null;
+        }
+
+        return message.getString("content");
+    }
+
+    private String normalizeMistakeAnalysis(String response) {
+        String text = response == null ? "" : response.trim();
+        if (containsAllSections(text)) {
+            return text;
+        }
+
+        return "错误原因：\n"
+                + text
+                + "\n\n根本问题：\n对同类题目的关键判断点还不够稳定，需要继续把知识点和解题步骤对齐。"
+                + "\n\n改进建议：\n"
+                + "1. 先重新梳理题目对应知识点和公式使用条件。\n"
+                + "2. 按“审题 - 列步骤 - 验算/复盘”重新做一遍同类题。\n"
+                + "3. 把这道题整理进错题本，隔天再做一次自测。"
+                + "\n\n推荐资源：\n"
+                + "1. 教材对应章节与课堂笔记。\n"
+                + "2. 近三次同类型错题。\n"
+                + "3. 同知识点基础题到变式题各 2-3 道。";
+    }
+
+    private boolean containsAllSections(String text) {
+        return text.contains("错误原因")
+                && text.contains("根本问题")
+                && text.contains("改进建议")
+                && text.contains("推荐资源");
     }
 
     private Map<String, String> createMessage(String role, String content) {
-        Map<String, String> message = new HashMap<>();
+        Map<String, String> message = new HashMap<String, String>();
         message.put("role", role);
         message.put("content", content);
         return message;
+    }
+
+    private String safeText(String value, String fallback) {
+        return isBlank(value) ? fallback : value.trim();
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
     }
 }
