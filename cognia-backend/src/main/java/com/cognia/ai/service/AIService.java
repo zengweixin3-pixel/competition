@@ -10,6 +10,7 @@ import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
+import okio.BufferedSource;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -18,6 +19,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 @Slf4j
 @Service
@@ -36,9 +38,9 @@ public class AIService {
     private String model;
 
     private final OkHttpClient client = new OkHttpClient.Builder()
-            .connectTimeout(60, TimeUnit.SECONDS)
-            .readTimeout(60, TimeUnit.SECONDS)
-            .writeTimeout(60, TimeUnit.SECONDS)
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(120, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
             .build();
 
     public enum Agent {
@@ -81,6 +83,64 @@ public class AIService {
         return callAI("chat-" + agent.name().toLowerCase(), systemPrompt, context, safeText(userMessage, "请给我一个学习建议。"));
     }
 
+    public void streamChat(Agent agent, String userMessage, String userDNA, String emotion, String context, Consumer<String> onChunk, Consumer<String> onComplete, Consumer<Exception> onError) {
+        String systemPrompt = buildAgentPrompt(agent, userDNA, emotion);
+        streamCallAI("chat-" + agent.name().toLowerCase(), systemPrompt, context, safeText(userMessage, "请给我一个学习建议。"), onChunk, onComplete, onError);
+    }
+
+    public void streamAnalyzeMistake(String mistakeContent, String subject, String userDNA, Consumer<String> onChunk, Consumer<String> onComplete, Consumer<Exception> onError) {
+        if (isBlank(mistakeContent)) {
+            onError.accept(new RuntimeException(MISTAKE_ANALYSIS_FAILURE));
+            return;
+        }
+        StringBuilder taskPrompt = new StringBuilder();
+        taskPrompt.append("请分析下面这道错题，并严格按四个小节输出。\n\n");
+        taskPrompt.append("学科：").append(safeText(subject, "未分类")).append("\n");
+        taskPrompt.append("错题内容：").append(mistakeContent.trim()).append("\n\n");
+        taskPrompt.append("输出要求：\n");
+        taskPrompt.append("1. 必须包含「错误原因 / 根本问题 / 改进建议 / 推荐资源」四个标题。\n");
+        taskPrompt.append("2. 每个标题下给出具体内容，不要只写一句空话。\n");
+        taskPrompt.append("3. 改进建议至少写 3 条，尽量能直接执行。\n");
+        taskPrompt.append("4. 推荐资源优先给教材章节、练习方向、复盘方法，不要编造外部链接。\n");
+        String systemPrompt = buildAgentPrompt(Agent.ANALYST, userDNA, "专注");
+        streamCallAI("mistake-analysis", systemPrompt, null, taskPrompt.toString(),
+                onChunk,
+                full -> {
+                    if (isFailureText(full)) {
+                        onError.accept(new RuntimeException(MISTAKE_ANALYSIS_FAILURE));
+                    } else {
+                        onComplete.accept(normalizeMistakeAnalysis(full));
+                    }
+                },
+                onError
+        );
+    }
+
+    public void streamAnalyzeEmotion(String emotionType, String content, String userDNA, Consumer<String> onChunk, Consumer<String> onComplete, Consumer<Exception> onError) {
+        StringBuilder taskPrompt = new StringBuilder();
+        taskPrompt.append("学生当前情绪：").append(safeText(emotionType, "普通")).append("\n");
+        taskPrompt.append("学生描述：").append(safeText(content, "暂时没有额外补充。")).append("\n\n");
+        taskPrompt.append("请先共情，再给出 2 到 3 条可以马上执行的建议，语气要温和、简洁。");
+        String systemPrompt = buildAgentPrompt(Agent.COMPANION, userDNA, emotionType);
+        streamCallAI("emotion-analysis", systemPrompt, null, taskPrompt.toString(), onChunk, onComplete, onError);
+    }
+
+    public void streamGenerateLearningPlan(String userDNA, String focus, Double dailyHours, String notes, Consumer<String> onChunk, Consumer<String> onComplete, Consumer<Exception> onError) {
+        double resolvedHours = dailyHours == null ? 2.0 : dailyHours;
+        StringBuilder taskPrompt = new StringBuilder();
+        taskPrompt.append("请为学生生成一份学习计划。\n\n");
+        taskPrompt.append("学习重点：").append(safeText(focus, "综合复习")).append("\n");
+        taskPrompt.append("每日可用时间：").append(resolvedHours).append(" 小时\n");
+        taskPrompt.append("补充说明：").append(safeText(notes, "无")).append("\n\n");
+        taskPrompt.append("请输出：\n");
+        taskPrompt.append("1. 今日安排\n");
+        taskPrompt.append("2. 任务拆解\n");
+        taskPrompt.append("3. 复盘建议\n");
+        taskPrompt.append("4. 休息提醒\n");
+        String systemPrompt = buildAgentPrompt(Agent.PLANNER, userDNA, "专注");
+        streamCallAI("generate-plan", systemPrompt, null, taskPrompt.toString(), onChunk, onComplete, onError);
+    }
+
     public String analyzeMistake(String mistakeContent, String subject, String userDNA) {
         if (isBlank(mistakeContent)) {
             return MISTAKE_ANALYSIS_FAILURE;
@@ -91,7 +151,7 @@ public class AIService {
         taskPrompt.append("学科：").append(safeText(subject, "未分类")).append("\n");
         taskPrompt.append("错题内容：").append(mistakeContent.trim()).append("\n\n");
         taskPrompt.append("输出要求：\n");
-        taskPrompt.append("1. 必须包含“错误原因 / 根本问题 / 改进建议 / 推荐资源”四个标题。\n");
+        taskPrompt.append("1. 必须包含「错误原因 / 根本问题 / 改进建议 / 推荐资源」四个标题。\n");
         taskPrompt.append("2. 每个标题下给出具体内容，不要只写一句空话。\n");
         taskPrompt.append("3. 改进建议至少写 3 条，尽量能直接执行。\n");
         taskPrompt.append("4. 推荐资源优先给教材章节、练习方向、复盘方法，不要编造外部链接。\n");
@@ -135,7 +195,7 @@ public class AIService {
         String systemPrompt = buildAgentPrompt(Agent.PLANNER, userDNA, "专注");
         String response = callAI("generate-plan", systemPrompt, null, taskPrompt.toString());
         if (isFailureText(response)) {
-            return "AI服务暂时不可用，请先按“主任务 1 个 + 巩固任务 1 个 + 复盘 1 次”的节奏安排今天的学习。";
+            return "AI服务暂时不可用，请先按「主任务 1 个 + 巩固任务 1 个 + 复盘 1 次」的节奏安排今天的学习。";
         }
         return response;
     }
@@ -175,7 +235,7 @@ public class AIService {
                 break;
             case ANALYST:
                 prompt.append("1. 先指出错在哪里，再分析为什么会错。\n");
-                prompt.append("2. 不要只说“粗心”或“多练”，要给出可执行的改进动作。\n");
+                prompt.append("2. 不要只说「粗心」或「多练」，要给出可执行的改进动作。\n");
                 prompt.append("3. 输出必须足够具体，便于学生直接复盘。\n");
                 break;
             case COMPANION:
@@ -271,6 +331,99 @@ public class AIService {
         }
     }
 
+    private void streamCallAI(String scene, String systemPrompt, String context, String userMessage, Consumer<String> onChunk, Consumer<String> onComplete, Consumer<Exception> onError) {
+        if (isBlank(apiKey) || isBlank(baseUrl) || isBlank(model)) {
+            log.error("AI configuration missing, scene={}, baseUrl={}, modelPresent={}", scene, baseUrl, !isBlank(model));
+            onError.accept(new RuntimeException(COMMON_AI_FAILURE));
+            return;
+        }
+
+        try {
+            List<Map<String, String>> messages = new ArrayList<Map<String, String>>();
+            messages.add(createMessage("system", systemPrompt));
+            if (!isBlank(context)) {
+                messages.add(createMessage("system", "补充上下文：\n" + context.trim()));
+            }
+            messages.add(createMessage("user", userMessage));
+
+            Map<String, Object> requestBody = new HashMap<String, Object>();
+            requestBody.put("model", model);
+            requestBody.put("messages", messages);
+            requestBody.put("temperature", 0.7);
+            requestBody.put("max_tokens", 2000);
+            requestBody.put("stream", true);
+
+            RequestBody body = RequestBody.create(
+                    JSON.toJSONString(requestBody),
+                    MediaType.parse("application/json")
+            );
+
+            Request request = new Request.Builder()
+                    .url(baseUrl + "/chat/completions")
+                    .header("Authorization", "Bearer " + apiKey)
+                    .header("Content-Type", "application/json")
+                    .post(body)
+                    .build();
+
+            client.newCall(request).enqueue(new okhttp3.Callback() {
+                @Override
+                public void onFailure(okhttp3.Call call, java.io.IOException e) {
+                    log.error("AI stream request failed, scene={}", scene, e);
+                    onError.accept(e);
+                }
+
+                @Override
+                public void onResponse(okhttp3.Call call, Response response) {
+                    try (ResponseBody responseBody = response.body()) {
+                        if (!response.isSuccessful() || responseBody == null) {
+                            String errBody = responseBody != null ? responseBody.string() : "";
+                            log.error("AI stream request failed, scene={}, code={}, body={}", scene, response.code(), errBody);
+                            onError.accept(new RuntimeException(COMMON_AI_FAILURE));
+                            return;
+                        }
+                        BufferedSource source = responseBody.source();
+                        StringBuilder fullContent = new StringBuilder();
+                        while (!source.exhausted()) {
+                            String line = source.readUtf8Line();
+                            if (line == null || line.isEmpty()) {
+                                continue;
+                            }
+                            if (line.startsWith("data:")) {
+                                String data = line.substring(5).trim();
+                                if ("[DONE]".equals(data)) {
+                                    break;
+                                }
+                                try {
+                                    JSONObject json = JSON.parseObject(data);
+                                    JSONArray choices = json.getJSONArray("choices");
+                                    if (choices != null && !choices.isEmpty()) {
+                                        JSONObject delta = choices.getJSONObject(0).getJSONObject("delta");
+                                        if (delta != null) {
+                                            String content = delta.getString("content");
+                                            if (content != null) {
+                                                fullContent.append(content);
+                                                onChunk.accept(content);
+                                            }
+                                        }
+                                    }
+                                } catch (Exception parseEx) {
+                                    log.warn("Failed to parse SSE chunk, data={}", data, parseEx);
+                                }
+                            }
+                        }
+                        onComplete.accept(fullContent.toString().trim());
+                    } catch (Exception e) {
+                        log.error("AI stream read exception, scene={}", scene, e);
+                        onError.accept(e);
+                    }
+                }
+            });
+        } catch (Exception e) {
+            log.error("AI stream setup exception, scene={}", scene, e);
+            onError.accept(e);
+        }
+    }
+
     private String extractContent(String bodyText) {
         JSONObject json = JSON.parseObject(bodyText);
         if (json == null) {
@@ -306,7 +459,7 @@ public class AIService {
                 + "\n\n根本问题：\n对同类题目的关键判断点还不够稳定，需要继续把知识点和解题步骤对齐。"
                 + "\n\n改进建议：\n"
                 + "1. 先重新梳理题目对应知识点和公式使用条件。\n"
-                + "2. 按“审题 - 列步骤 - 验算/复盘”重新做一遍同类题。\n"
+                + "2. 按「审题 - 列步骤 - 验算/复盘」重新做一遍同类题。\n"
                 + "3. 把这道题整理进错题本，隔天再做一次自测。"
                 + "\n\n推荐资源：\n"
                 + "1. 教材对应章节与课堂笔记。\n"
